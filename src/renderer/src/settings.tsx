@@ -9,6 +9,7 @@ export interface Settings {
   wordWrap: boolean;
   theme: 'cosmos' | 'liquid';
   installedPacks: string[];
+  explorer: 'pinned' | 'auto';
 }
 
 const DEFAULTS: Settings = {
@@ -20,6 +21,7 @@ const DEFAULTS: Settings = {
   wordWrap: false,
   theme: 'cosmos',
   installedPacks: ['typescript', 'javascript'],
+  explorer: 'pinned',
 };
 
 const KEY = 'luma.settings';

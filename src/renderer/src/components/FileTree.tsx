@@ -106,6 +106,7 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
 }
 
 /** The invisible hover strip on the window's left edge that wakes the explorer. */
-export function ExplorerWake({ onWake }: { onWake: () => void }) {
+export function ExplorerWake({ onWake, enabled }: { onWake: () => void; enabled: boolean }) {
+  if (!enabled) return null;
   return <div className="fixed left-0 top-0 z-50 h-full w-1.5" onMouseEnter={onWake} />;
 }
