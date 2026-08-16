@@ -148,7 +148,7 @@ function UntrackedView({ path }: { path: string }) {
   const { setToast } = useStore();
   const [content, setContent] = useState<string | null>(null);
   useEffect(() => {
-    import('../lib/api').then(({ api }) => api.fs.read(path).then((r) => setContent(r.ok ? r.data ?? null : null)));
+    import('../lib/api').then(({ api }) => api.fsRead(path).then((r) => setContent(r.ok ? r.data ?? null : null)));
   }, [path]);
   return (
     <div className="m-2 overflow-hidden rounded-xl border border-white/8">

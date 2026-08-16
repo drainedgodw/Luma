@@ -27,7 +27,7 @@ export default function EditorPane({ path }: { path: string }) {
 
   useEffect(() => {
     let disposed = false;
-    api.fs.read(path).then((r) => {
+    api.fsRead(path).then((r) => {
       if (disposed || !holder.current) return;
       const state = EditorState.create({
         doc: r.ok ? r.data : `(unreadable: ${r.error?.message})`,
@@ -63,7 +63,7 @@ export default function EditorPane({ path }: { path: string }) {
   async function save() {
     if (!view.current) return;
     setSaving(true);
-    await api.fs.write(path, view.current.state.doc.toString());
+    await api.fsWrite(path, view.current.state.doc.toString());
     setDirty(false);
     setSaving(false);
     await refresh();
