@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { StoreProvider, useStore } from './store';
-import { SettingsProvider } from './settings';
+import { SettingsProvider, useSettings } from './settings';
 import { WorkspaceProvider, useWorkspace } from './workspace';
 import GraphView from './views/GraphView';
 import ChangesView from './views/ChangesView';
