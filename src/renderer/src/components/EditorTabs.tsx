@@ -1,12 +1,15 @@
 import { useWorkspace } from '../workspace';
 import { Icon } from './Icons';
+import { fileBadge } from '../languages';
 
 export default function EditorTabs() {
   const { tabs, active, setActive, closeTab } = useWorkspace();
   if (tabs.length === 0) return null;
   return (
     <div className="glass-soft mx-3 flex items-center gap-1 overflow-x-auto p-1.5">
-      {tabs.map((t) => (
+      {tabs.map((t) => {
+        const badge = fileBadge(t.path);
+        return (
         <div
           key={t.path}
           onClick={() => setActive(t.path)}
@@ -15,6 +18,12 @@ export default function EditorTabs() {
             active === t.path ? 'bg-lilac/15 text-white/90 shadow-[inset_0_0_0_1px_rgba(196,181,253,0.25)]' : 'text-white/50 hover:bg-white/5'
           }`}
         >
+          <span
+            className="rounded px-1 text-[8px] font-bold leading-4"
+            style={{ color: badge.color, background: `${badge.color}1c` }}
+          >
+            {badge.label}
+          </span>
           <span className="font-mono">{t.name}</span>
           {t.dirty && <span className="h-1.5 w-1.5 rounded-full bg-amber" />}
           <button
@@ -27,7 +36,8 @@ export default function EditorTabs() {
             <Icon name="close" />
           </button>
         </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
