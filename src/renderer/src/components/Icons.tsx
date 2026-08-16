@@ -33,6 +33,11 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M6 7.4v9.2M18 10.4c0 4-5.5 3.6-8.5 5.1" />
     </svg>
   ),
+  code: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 6l-5 6 5 6M16 6l5 6-5 6M13 4l-2 16" />
+    </svg>
+  ),
   close: (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <path d="M5 5l14 14M19 5L5 19" />

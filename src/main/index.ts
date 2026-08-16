@@ -23,6 +23,10 @@ function createWindow() {
     },
   });
   win.on('ready-to-show', () => win?.show());
+  if (process.env.LUMA_REPO) {
+    (win as BrowserWindow & { __repo?: string }).__repo = process.env.LUMA_REPO;
+    win.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent('luma:open', { detail: ${JSON.stringify(process.env.LUMA_REPO)} }))`).catch(() => {});
+  }
   if (process.env.LUMA_SHOT) {
     setTimeout(async () => {
       const image = await win!.webContents.capturePage();

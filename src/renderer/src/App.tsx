@@ -1,35 +1,46 @@
 import { useState } from 'react';
 import { StoreProvider, useStore } from './store';
+import { WorkspaceProvider, useWorkspace } from './workspace';
 import GraphView from './views/GraphView';
 import ChangesView from './views/ChangesView';
-import BisectView from './views/BisectView';
+import EditorWorkspace from './views/EditorWorkspace';
 import FileTree from './components/FileTree';
+import EditorTabs from './components/EditorTabs';
 import CommandLog from './components/CommandLog';
 import Toast from './components/Toast';
+import BisectView from './views/BisectView';
 import { Icon } from './components/Icons';
 
-type View = 'graph' | 'changes';
+type View = 'graph' | 'changes' | 'editor';
 
 function Shell() {
   const { repo, status, openRepo } = useStore();
+  const { openFile } = useWorkspace();
   const [view, setView] = useState<View>('graph');
   const [showTree, setShowTree] = useState(true);
   const [showLog, setShowLog] = useState(false);
 
   if (!repo) return <Welcome />;
 
+  const dirtyCount = status?.entries.length ?? 0;
+
   return (
     <div className="relative flex h-full w-full flex-col">
       {/* Title bar */}
       <header className="glass mx-3 mt-3 flex h-12 items-center gap-3 px-4" style={{ WebkitAppRegion: 'drag' } as never}>
-        <div className="flex items-center gap-2 select-none">
-          <span className="text-[15px] font-bold tracking-[0.25em] text-lilac">LUMA</span>
+        <div className="flex items-center gap-1.5">
+          <TrafficLight color="#f56565" />
+          <TrafficLight color="#ecc94b" />
+          <TrafficLight color="#68d391" />
         </div>
-        <span className="text-white/30">/</span>
-        <span className="truncate font-mono text-xs text-white/70">{repo}</span>
+        <span className="ml-2 text-[14px] font-bold tracking-[0.25em] text-lilac">LUMA</span>
+        <span className="text-white/20">/</span>
+        <span className="truncate font-mono text-xs text-white/60">{repo.split('/').pop()}</span>
         {status?.branch && (
-          <span className="rounded-full border border-teal/40 bg-teal/10 px-2 py-0.5 text-[11px] text-teal">
-            {status.state === 'detached' ? 'detached' : status.branch}
+          <span className={`rounded-full border px-2 py-0.5 text-[11px] ${status.state === 'detached' ? 'border-amber/40 bg-amber/10 text-amber' : 'border-teal/40 bg-teal/10 text-teal'}`}>
+            ⎇ {status.state === 'detached' ? 'detached' : status.branch}
+            {status.ahead > 0 && <span className="ml-1 text-white/70">↑{status.ahead}</span>}
+            {status.behind > 0 && <span className="ml-1 text-white/70">↓{status.behind}</span>}
           </span>
         )}
         {status && status.state !== 'branch' && status.state !== 'detached' && (
@@ -39,28 +50,31 @@ function Shell() {
         )}
         <div className="flex-1" />
         <div style={{ WebkitAppRegion: 'no-drag' } as never} className="flex items-center gap-2">
-          {view === 'changes' && <ChangesActions />}
           <button className="btn text-xs" onClick={() => setShowTree((v) => !v)}>Explorer</button>
           <button className="btn text-xs" onClick={() => setShowLog((v) => !v)}>Commands</button>
           <button className="btn text-xs" onClick={() => openRepo()}>Open…</button>
         </div>
       </header>
 
-      <div className="flex min-h-0 flex-1 gap-3 p-3">
-        {/* Dock */}
-        <nav className="glass flex w-14 flex-col items-center gap-1 py-3">
-          <DockBtn active={view === 'graph'} onClick={() => setView('graph')} label="History" icon={<Icon name="graph" />} />
-          <DockBtn active={view === 'changes'} onClick={() => setView('changes')} label="Changes" icon={<Icon name="changes" />} badge={countDirty()} />
-          <div className="mt-auto flex flex-col gap-1">
-            <DockBtn active={false} onClick={() => openRepo()} label="Open repository" icon={<Icon name="folder" />} />
-          </div>
-        </nav>
+      <div className="flex min-h-0 flex-1 flex-col gap-2 p-3">
+        <div className="flex min-h-0 flex-1 gap-3">
+          {/* Dock */}
+          <nav className="glass flex w-14 flex-col items-center gap-1.5 py-3">
+            <DockBtn active={view === 'editor'} onClick={() => setView('editor')} label="Editor" icon={<Icon name="code" />} />
+            <DockBtn active={view === 'graph'} onClick={() => setView('graph')} label="History" icon={<Icon name="graph" />} />
+            <DockBtn active={view === 'changes'} onClick={() => setView('changes')} label="Changes" icon={<Icon name="changes" />} badge={dirtyCount > 0 ? String(dirtyCount > 99 ? '99+' : dirtyCount) : null} />
+            <div className="mt-auto flex flex-col gap-1.5">
+              <DockBtn active={false} onClick={() => openRepo()} label="Open repository" icon={<Icon name="folder" />} />
+            </div>
+          </nav>
 
-        {showTree && <FileTree />}
+          {showTree && <FileTree />}
 
-        <main className="min-w-0 flex-1">
-          {view === 'graph' ? <GraphView /> : <ChangesView />}
-        </main>
+          <main className="flex min-w-0 flex-1 flex-col gap-2">
+            {view === 'editor' && <EditorTabs />}
+            {view === 'graph' ? <GraphView /> : view === 'changes' ? <ChangesView onOpenFile={openFile} /> : <EditorWorkspace />}
+          </main>
+        </div>
       </div>
 
       {showLog && <CommandLog onClose={() => setShowLog(false)} />}
@@ -68,15 +82,10 @@ function Shell() {
       <Toast />
     </div>
   );
-
-  function countDirty() {
-    const n = status?.entries.length ?? 0;
-    return n > 0 ? (n > 99 ? '99+' : String(n)) : null;
-  }
 }
 
-function ChangesActions() {
-  return null;
+function TrafficLight({ color }: { color: string }) {
+  return <span className="block h-3 w-3 rounded-full" style={{ background: color, boxShadow: `0 0 8px ${color}66` }} />;
 }
 
 function DockBtn({ active, onClick, label, icon, badge }: { active: boolean; onClick: () => void; label: string; icon: React.ReactNode; badge?: string | null }) {
@@ -87,7 +96,7 @@ function DockBtn({ active, onClick, label, icon, badge }: { active: boolean; onC
       className={`relative flex h-11 w-11 items-center justify-center rounded-xl border transition-all duration-200 ${
         active
           ? 'border-lilac/50 bg-lilac/15 text-lilac shadow-[0_0_16px_rgba(196,181,253,0.25)]'
-          : 'border-transparent text-white/50 hover:border-white/10 hover:bg-white/5 hover:text-white/80'
+          : 'border-transparent text-white/45 hover:border-white/10 hover:bg-white/5 hover:text-white/80'
       }`}
     >
       {icon}
@@ -102,7 +111,7 @@ function Welcome() {
   const { openRepo } = useStore();
   const [recent, setRecent] = useState<string[]>([]);
   useState(() => {
-    api.recentRepos().then(setRecent);
+    import('./lib/api').then(({ api }) => api.recentRepos().then(setRecent));
   });
   return (
     <div className="flex h-full flex-col items-center justify-center gap-8">
@@ -127,13 +136,13 @@ function Welcome() {
   );
 }
 
-import { api } from './lib/api';
-
 export default function App() {
   return (
     <StoreProvider>
-      <div className="cosmos" />
-      <Shell />
+      <WorkspaceProvider>
+        <div className="cosmos" />
+        <Shell />
+      </WorkspaceProvider>
     </StoreProvider>
   );
 }
