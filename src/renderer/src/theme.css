@@ -120,5 +120,49 @@ input.field:focus, textarea.field:focus { border-color: rgba(196,181,253,.5); }
 .detective-node { animation: pulseGlow 1.6s ease-in-out infinite; }
 
 .cm-editor { background: transparent !important; height: 100%; }
-.cm-editor .cm-scroller { font-family: var(--font-mono); font-size: 12.5px; }
-.cm-gutters { background: transparent !important; border-right: 1px solid var(--glass-border) !important; }
+.cm-editor .cm-scroller { font-family: var(--font-mono); }
+.cm-gutters { background: transparent !important; }
+
+/* VS Code Dark+ token palette */
+.cm-keyword { color: #c586c0 !important; }
+.cm-controlKeyword { color: #c586c0 !important; }
+.cm-operatorKeyword { color: #d4d4d4 !important; }
+.cm-definitionKeyword { color: #569cd6 !important; }
+.cm-moduleKeyword { color: #c586c0 !important; }
+.cm-string { color: #ce9178 !important; }
+.cm-stringSpecial { color: #d16969 !important; }
+.cm-escape { color: #d7ba7d !important; }
+.cm-number { color: #b5cea8 !important; }
+.cm-bool { color: #569cd6 !important; }
+.cm-null { color: #569cd6 !important; }
+.cm-comment { color: #6a9955 !important; font-style: italic; }
+.cm-lineComment, .cm-blockComment { color: #6a9955 !important; font-style: italic; }
+.cm-variableName { color: #9cdcfe !important; }
+.cm-variableName.definition { color: #dcdcaa !important; }
+.cm-propertyName { color: #9cdcfe !important; }
+.cm-function { color: #dcdcaa !important; }
+.cm-functionVariableName { color: #dcdcaa !important; }
+.cm-typeName, .cm-className { color: #4ec9b0 !important; }
+.cm-typeName { color: #4ec9b0 !important; }
+.cm-namespace { color: #4ec9b0 !important; }
+.cm-atom { color: #569cd6 !important; }
+.cm-operator { color: #d4d4d4 !important; }
+.cm-punctuation { color: #d4d4d4 !important; }
+.cm-bracket { color: #ffd700 !important; }
+.cm-macroName { color: #dcdcaa !important; }
+.cm-labelName { color: #c8c8c8 !important; }
+.cm-attributeName { color: #9cdcfe !important; }
+.cm-attributeValue { color: #ce9178 !important; }
+.cm-tagName { color: #569cd6 !important; }
+.cm-link { color: #3798ff !important; text-decoration: underline; }
+.cm-heading { color: #569cd6 !important; font-weight: 700; }
+.cm-emphasis { font-style: italic; }
+.cm-strong { font-weight: 700; }
+.cm-meta { color: #808080 !important; }
+.cm-ghostText { color: rgba(255,255,255,0.38); font-style: italic; }
+
+/* reduced motion */
+.reduce-motion *, .reduce-motion *::before, .reduce-motion *::after {
+  animation: none !important;
+  transition: none !important;
+}
