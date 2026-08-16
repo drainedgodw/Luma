@@ -8,6 +8,7 @@ import EditorWorkspace from './views/EditorWorkspace';
 import SettingsView from './views/SettingsView';
 import StoreView from './views/StoreView';
 import FileTree from './components/FileTree';
+import { ExplorerWake } from './components/FileTree';
 import EditorTabs from './components/EditorTabs';
 import CommandLog from './components/CommandLog';
 import Toast from './components/Toast';
@@ -22,6 +23,7 @@ function Shell() {
   const { openFile } = useWorkspace();
   const [view, setView] = useState<View>('graph');
   const [showLog, setShowLog] = useState(false);
+  const [explorerAwake, setExplorerAwake] = useState(false);
 
   useEffect(() => {
     const onOpenFile = (e: Event) => {
@@ -79,7 +81,8 @@ function Shell() {
             </div>
           </nav>
 
-          <FileTree />
+          <ExplorerWake onWake={() => setExplorerAwake(true)} />
+          <FileTree awake={explorerAwake} onCollapse={() => setExplorerAwake(false)} />
 
           <main className="flex min-w-0 flex-1 flex-col gap-2">
             {view === 'editor' && <EditorTabs />}
