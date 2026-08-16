@@ -1,0 +1,19 @@
+appId: dev.luma.ide
+productName: Luma
+directories:
+  output: dist
+files:
+  - out/**/*
+  - package.json
+linux:
+  target:
+    - AppImage
+    - tar.gz
+  category: Development
+  icon: build/icon.png
+  desktop:
+    Name: Luma
+    Exec: luma --ozone-platform-hint=auto %U
+electronDownload:
+  mirror: https://github.com/electron/electron/releases/download
+asar: true
