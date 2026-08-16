@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { useWorkspace } from '../workspace';
 import { useSettings } from '../settings';
 import { fileBadge } from '../languages';
+import { Icon } from './Icons';
 
 interface Node {
   name: string;
@@ -71,11 +72,14 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
         <div className="flex items-center gap-2 border-b border-white/8 px-3 py-2">
           <span className="flex-1 text-[11px] uppercase tracking-wider text-white/40">Explorer</span>
           <button
-            className={`rounded-md px-1.5 py-0.5 text-[11px] transition-colors ${pinned ? 'text-lilac' : 'text-white/30 hover:text-white/70'}`}
-            title={pinned ? 'Unpin — the panel will hide until you hover the left edge' : 'Pin the panel open'}
+            className={`flex items-center gap-1 rounded-md px-2 py-1 text-[10px] transition-colors ${
+              pinned ? 'border border-lilac/50 bg-lilac/15 text-lilac' : 'border border-white/10 text-white/45 hover:text-white/85'
+            }`}
+            title={pinned ? 'Pinned — click to unpin (panel hides until you hover the left edge)' : 'Not pinned — click to keep the panel always open'}
             onClick={() => update({ explorer: pinned ? 'auto' : 'pinned' })}
           >
-            ⊙
+            <Icon name="pin" />
+            {pinned ? 'pinned' : 'pin'}
           </button>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto py-1">
@@ -110,8 +114,8 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
   );
 }
 
-/** Invisible hover strip on the window's left edge that wakes the explorer (auto mode only). */
+/** Wide invisible strip on the window's left edge that wakes the explorer (auto mode only). */
 export function ExplorerWake({ onWake, enabled }: { onWake: () => void; enabled: boolean }) {
   if (!enabled) return null;
-  return <div className="fixed left-0 top-0 z-50 h-full w-1.5" onMouseEnter={onWake} />;
+  return <div className="fixed left-0 top-0 z-50 h-full w-3" onMouseEnter={onWake} />;
 }

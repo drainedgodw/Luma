@@ -22,6 +22,15 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
+  if (process.env.LUMA_THEME) {
+    const theme = process.env.LUMA_THEME;
+    win.webContents.on('did-finish-load', () => {
+      win!.webContents
+        .executeJavaScript(`window.dispatchEvent(new CustomEvent('luma:theme', { detail: ${JSON.stringify(theme)} }))`)
+        .catch(() => {});
+    });
+  }
+
   win.on('ready-to-show', () => win?.show());
   if (process.env.LUMA_REPO) {
     (win as BrowserWindow & { __repo?: string }).__repo = process.env.LUMA_REPO;
