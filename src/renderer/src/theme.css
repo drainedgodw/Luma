@@ -169,47 +169,51 @@ input.field:focus, textarea.field:focus { border-color: rgba(196,181,253,.5); }
 
 /* ---- Liquid Glass theme: neutral frosted glass, iOS style ---- */
 html[data-theme='liquid'] body {
-  background: #0c0c11;
+  background: transparent;
 }
 html[data-theme='liquid'] .cosmos {
   background:
-    radial-gradient(1100px 650px at 25% -10%, rgba(255, 255, 255, 0.07), transparent 60%),
-    radial-gradient(900px 600px at 85% 105%, rgba(255, 255, 255, 0.05), transparent 55%);
+    radial-gradient(1100px 650px at 25% -10%, rgba(255, 255, 255, 0.05), transparent 60%),
+    radial-gradient(900px 600px at 85% 105%, rgba(255, 255, 255, 0.04), transparent 55%);
 }
 html[data-theme='liquid'] .glass {
-  background: rgba(255, 255, 255, 0.11);
-  border-color: rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(30px) saturate(1.7);
-  -webkit-backdrop-filter: blur(30px) saturate(1.7);
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.40), inset 0 1px 0 rgba(255,255,255,0.16);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(28px) saturate(1.6);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.14);
 }
 html[data-theme='liquid'] .glass-soft {
-  background: rgba(255, 255, 255, 0.075);
-  border-color: rgba(255, 255, 255, 0.13);
-  backdrop-filter: blur(20px) saturate(1.5);
-  -webkit-backdrop-filter: blur(20px) saturate(1.5);
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
 }
 html[data-theme='liquid'] .btn {
-  background: rgba(255, 255, 255, 0.10);
-  border-color: rgba(255, 255, 255, 0.18);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 html[data-theme='liquid'] .btn:hover {
-  background: rgba(255, 255, 255, 0.18);
-  border-color: rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
 }
 html[data-theme='liquid'] .btn-primary {
-  background: rgba(255, 255, 255, 0.22);
-  border-color: rgba(255, 255, 255, 0.38);
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.35);
   color: #fff;
-  box-shadow: 0 4px 18px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.25);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.22);
 }
 html[data-theme='liquid'] .btn-primary:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.26);
 }
 html[data-theme='liquid'] input.field,
 html[data-theme='liquid'] textarea.field {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.13);
+}
+/* no dark scrims behind content — keep text crisp on any backdrop */
+html[data-theme='liquid'] .glass ::before,
+html[data-theme='liquid'] .bg-black\/25,
+html[data-theme='liquid'] .bg-black\/30 {
+  background: rgba(255, 255, 255, 0.03) !important;
 }
