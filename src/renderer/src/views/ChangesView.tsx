@@ -4,6 +4,7 @@ import { useStore } from '../store';
 import { gitCall } from '../lib/api';
 import DiffView from '../components/DiffView';
 import ConflictModal from '../components/ConflictModal';
+import StashDrawer from '../components/StashDrawer';
 import { fileBadge } from '../languages';
 
 export default function ChangesView({ onOpenFile }: { onOpenFile: (path: string) => void }) {
@@ -13,6 +14,7 @@ export default function ChangesView({ onOpenFile }: { onOpenFile: (path: string)
   const [message, setMessage] = useState('');
   const [dragOver, setDragOver] = useState<'stage' | 'unstage' | null>(null);
   const [conflict, setConflict] = useState<ConflictFile | null>(null);
+  const [stashOpen, setStashOpen] = useState(false);
 
   const staged = useMemo(() => status?.entries.filter((e) => e.staged && !e.conflicted) ?? [], [status]);
   const unstaged = useMemo(() => status?.entries.filter((e) => (!e.staged || e.conflicted) && (e.unstaged || e.untracked || e.conflicted)) ?? [], [status]);
@@ -140,7 +142,7 @@ export default function ChangesView({ onOpenFile }: { onOpenFile: (path: string)
               <button className="btn btn-primary flex-1 text-xs" disabled={!message.trim() || staged.length === 0} onClick={doCommit} title="⌘/Ctrl+Enter">
                 Commit {staged.length > 0 ? `(${staged.length})` : ''}
               </button>
-              <button className="btn px-2 py-1 text-[11px]" title="git stash push" onClick={() => act(() => gitCall('stashPush'))}>Stash</button>
+              <button className="btn px-2 py-1 text-[11px]" title="Open the stash drawer" onClick={() => setStashOpen(true)}>🗂 Stash</button>
             </div>
           </div>
         </section>
@@ -164,6 +166,7 @@ export default function ChangesView({ onOpenFile }: { onOpenFile: (path: string)
       </div>
 
       {conflict && <ConflictModal file={conflict} onClose={() => setConflict(null)} onResolved={refresh} />}
+      {stashOpen && <StashDrawer onClose={() => setStashOpen(false)} />}
     </div>
   );
 }

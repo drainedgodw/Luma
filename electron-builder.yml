@@ -17,3 +17,5 @@ linux:
 electronDownload:
   mirror: https://github.com/electron/electron/releases/download
 asar: true
+asarUnpack:
+  - node_modules/node-pty/**

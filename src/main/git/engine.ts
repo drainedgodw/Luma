@@ -265,16 +265,81 @@ export async function getRemotes(repo: string): Promise<string[]> {
 }
 
 export async function stashPush(repo: string, message?: string): Promise<void> {
-  const args = ['stash', 'push'];
+  const args = ['stash', 'push', '--include-untracked'];
   if (message) args.push('-m', message);
   await runGit(repo, args);
 }
 
-export async function stashPop(repo: string): Promise<void> {
-  await runGit(repo, ['stash', 'pop']);
+export async function stashPop(repo: string, ref?: string): Promise<void> {
+  await runGit(repo, ['stash', 'pop', ...(ref ? [ref] : [])]);
 }
 
-export async function stashList(repo: string): Promise<string[]> {
-  const out = await runGit(repo, ['stash', 'list', '--format=%gd %s']);
-  return out.split('\n').filter(Boolean);
+export async function stashApply(repo: string, ref: string): Promise<void> {
+  await runGit(repo, ['stash', 'apply', ref]);
+}
+
+export async function stashDrop(repo: string, ref: string): Promise<void> {
+  await runGit(repo, ['stash', 'drop', ref]);
+}
+
+export interface StashEntry {
+  ref: string;
+  hash: string;
+  timestamp: number;
+  message: string;
+  files: number;
+  insertions: number;
+  deletions: number;
+}
+
+export async function stashList(repo: string): Promise<StashEntry[]> {
+  const out = await runGit(repo, ['stash', 'list', '--format=%gd\u001f%h\u001f%ct\u001f%s']);
+  const entries: StashEntry[] = [];
+  for (const rec of out.split('\n').filter(Boolean)) {
+    const [ref, hash, ts, message] = rec.split('\u001f');
+    entries.push({ ref, hash, timestamp: parseInt(ts, 10) || 0, message, files: 0, insertions: 0, deletions: 0 });
+  }
+  for (const e of entries) {
+    try {
+      let stat = await runGit(repo, ['stash', 'show', '--numstat', '--format=', e.ref]);
+      if (!stat.trim()) {
+        // untracked-only stash: contents live in the third parent
+        stat = await runGit(repo, ['show', '--numstat', '--format=', `${e.ref}^3`]);
+      }
+      for (const line of stat.split('\n').filter(Boolean)) {
+        const [a, d] = line.split('\t');
+        e.files++;
+        e.insertions += a === '-' ? 0 : parseInt(a, 10) || 0;
+        e.deletions += d === '-' ? 0 : parseInt(d, 10) || 0;
+      }
+    } catch {
+      /* binary or unreadable */
+    }
+  }
+  return entries;
+}
+
+export interface ReflogEntry {
+  hash: string;
+  shortHash: string;
+  selector: string;
+  summary: string;
+}
+
+export async function reflog(repo: string, limit = 30): Promise<ReflogEntry[]> {
+  const out = await runGit(repo, ['reflog', `--max-count=${limit}`, '--format=%H\u001f%h\u001f%gd\u001f%gs']);
+  const entries: ReflogEntry[] = [];
+  for (const rec of out.split('\n').filter(Boolean)) {
+    const [hash, shortHash, selector, summary] = rec.split('\u001f');
+    entries.push({ hash, shortHash, selector, summary });
+  }
+  return entries;
+}
+
+export async function rewindHard(repo: string, ref: string): Promise<void> {
+  await runGit(repo, ['reset', '--hard', ref]);
+}
+
+export async function rewindSoft(repo: string, ref: string): Promise<void> {
+  await runGit(repo, ['reset', '--soft', ref]);
 }
