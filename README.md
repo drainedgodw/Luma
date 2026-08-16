@@ -1,3 +1,7 @@
+<div align="center">
+
+<img src="build/icon.png" width="96" alt="Luma logo" />
+
 # Luma
 
 **See your Git. No commands required.**
@@ -5,6 +9,8 @@
 Luma is an open-source, Git-first IDE for Linux (Arch first, everyone else next). It renders your entire repository history as a living graph, turns staging into drag & drop, and teaches Git by showing the command behind every click — instead of asking you to memorize one.
 
 ![status](https://img.shields.io/badge/platform-Linux%20·%20Arch-informational) ![license](https://img.shields.io/badge/license-MIT-success)
+
+</div>
 
 ## Highlights
 
