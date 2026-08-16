@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { Commit, CommandLogEntry, GitStatus } from '@shared/types';
 import { gitCall, api } from './lib/api';
 
@@ -22,10 +22,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [commits, setCommits] = useState<Commit[]>([]);
   const [commands, setCommands] = useState<CommandLogEntry[]>([]);
   const [toast, setToast] = useState<string | null>(null);
+  const openRepoRef = useRef<((p: string) => Promise<void>) | null>(null);
 
   useEffect(() => {
     api.onCommand((e) => setCommands((c) => [e, ...c].slice(0, 60)));
     api.repoPath().then((p) => p && setRepo(p));
+    const onOpen = (e: Event) => openRepoRef.current?.((e as CustomEvent<string>).detail);
+    window.addEventListener('luma:open', onOpen);
+    return () => window.removeEventListener('luma:open', onOpen);
   }, []);
 
   const refresh = useCallback(async () => {
@@ -53,6 +57,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setToast(r.error?.message ?? 'Failed to open');
     }
   }, []);
+  openRepoRef.current = openRepo;
 
   return (
     <Ctx.Provider value={{ repo, status, commits, commands, openRepo, refresh, toast, setToast }}>

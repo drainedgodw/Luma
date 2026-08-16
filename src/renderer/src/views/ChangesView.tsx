@@ -5,7 +5,7 @@ import { gitCall } from '../lib/api';
 import DiffView from '../components/DiffView';
 import ConflictModal from '../components/ConflictModal';
 
-export default function ChangesView() {
+export default function ChangesView({ onOpenFile }: { onOpenFile: (path: string) => void }) {
   const { status, refresh, setToast } = useStore();
   const [selectedFile, setSelectedFile] = useState<StatusEntry | null>(null);
   const [diff, setDiff] = useState<DiffFile[] | null>(null);
@@ -82,7 +82,7 @@ export default function ChangesView() {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
             {unstaged.length === 0 && <div className="px-2 py-3 text-xs text-white/35">Clean. Nothing unstaged.</div>}
-            {unstaged.map((e) => <FileRow key={e.path} entry={e} selected={selectedFile?.path === e.path} onClick={() => setSelectedFile(e)} />)}
+            {unstaged.map((e) => <FileRow key={e.path} entry={e} selected={selectedFile?.path === e.path} onClick={() => setSelectedFile(e)} onOpenFile={onOpenFile} />)}
           </div>
         </div>
 
@@ -98,7 +98,7 @@ export default function ChangesView() {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
             {staged.length === 0 && <div className="px-2 py-3 text-xs text-white/35">Drag files here to stage them.</div>}
-            {staged.map((e) => <FileRow key={e.path} entry={e} selected={selectedFile?.path === e.path} onClick={() => setSelectedFile(e)} staged />)}
+            {staged.map((e) => <FileRow key={e.path} entry={e} selected={selectedFile?.path === e.path} onClick={() => setSelectedFile(e)} staged onOpenFile={onOpenFile} />)}
           </div>
           <div className="border-t border-white/8 p-2.5">
             <textarea className="field mb-2 h-16 w-full resize-none text-xs" placeholder="Commit message…" value={message}
@@ -129,17 +129,26 @@ export default function ChangesView() {
   );
 }
 
-function FileRow({ entry, selected, onClick, staged }: { entry: StatusEntry; selected: boolean; onClick: () => void; staged?: boolean }) {
+function FileRow({ entry, selected, onClick, staged, onOpenFile }: { entry: StatusEntry; selected: boolean; onClick: () => void; staged?: boolean; onOpenFile: (p: string) => void }) {
   return (
     <div
       draggable
       onDragStart={(e) => e.dataTransfer.setData('application/luma-paths', JSON.stringify([entry.origPath ?? entry.path]))}
-      onClick={onClick}
       className={`group flex cursor-grab items-center gap-2 rounded-lg px-2 py-1.5 ${selected ? 'bg-lilac/15' : 'hover:bg-white/6'} active:cursor-grabbing`}
     >
       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${entry.conflicted ? 'bg-amber' : staged ? 'bg-teal' : entry.untracked ? 'bg-white/30' : 'bg-rose'}`} />
-      <span className="flex-1 truncate font-mono text-xs text-white/80" title={entry.path}>{entry.path}</span>
+      <span className="flex-1 truncate font-mono text-xs text-white/80" title={entry.path} onClick={onClick}>{entry.path}</span>
       <span className="text-[10px] text-white/30">{entry.x}{entry.y === '?' ? '' : entry.y}</span>
+      <button
+        className="hidden shrink-0 rounded px-1 text-[10px] text-lilac/70 hover:text-lilac group-hover:block"
+        title="Open in editor"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenFile(entry.path);
+        }}
+      >
+        open
+      </button>
     </div>
   );
 }
