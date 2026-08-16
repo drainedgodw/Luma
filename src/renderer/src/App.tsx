@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { StoreProvider, useStore } from './store';
+import { SettingsProvider } from './settings';
 import { WorkspaceProvider, useWorkspace } from './workspace';
 import GraphView from './views/GraphView';
 import ChangesView from './views/ChangesView';
 import EditorWorkspace from './views/EditorWorkspace';
+import SettingsView from './views/SettingsView';
+import StoreView from './views/StoreView';
 import FileTree from './components/FileTree';
 import EditorTabs from './components/EditorTabs';
 import CommandLog from './components/CommandLog';
@@ -11,7 +14,7 @@ import Toast from './components/Toast';
 import BisectView from './views/BisectView';
 import { Icon } from './components/Icons';
 
-type View = 'graph' | 'changes' | 'editor';
+type View = 'editor' | 'graph' | 'changes' | 'languages' | 'settings';
 
 function Shell() {
   const { repo, status, openRepo } = useStore();
@@ -50,9 +53,9 @@ function Shell() {
         )}
         <div className="flex-1" />
         <div style={{ WebkitAppRegion: 'no-drag' } as never} className="flex items-center gap-2">
-          <button className="btn text-xs" onClick={() => setShowTree((v) => !v)}>Explorer</button>
-          <button className="btn text-xs" onClick={() => setShowLog((v) => !v)}>Commands</button>
-          <button className="btn text-xs" onClick={() => openRepo()}>Open…</button>
+          <button className="btn text-xs" title="Show or hide the file explorer (Ctrl+B)" onClick={() => setShowTree((v) => !v)}>Explorer</button>
+          <button className="btn text-xs" title="Show the git commands Luma runs for you" onClick={() => setShowLog((v) => !v)}>Commands</button>
+          <button className="btn text-xs" title="Open another repository" onClick={() => openRepo()}>Open…</button>
         </div>
       </header>
 
@@ -63,7 +66,9 @@ function Shell() {
             <DockBtn active={view === 'editor'} onClick={() => setView('editor')} label="Editor" icon={<Icon name="code" />} />
             <DockBtn active={view === 'graph'} onClick={() => setView('graph')} label="History" icon={<Icon name="graph" />} />
             <DockBtn active={view === 'changes'} onClick={() => setView('changes')} label="Changes" icon={<Icon name="changes" />} badge={dirtyCount > 0 ? String(dirtyCount > 99 ? '99+' : dirtyCount) : null} />
+            <DockBtn active={view === 'languages'} onClick={() => setView('languages')} label="Languages" icon={<Icon name="grid" />} />
             <div className="mt-auto flex flex-col gap-1.5">
+              <DockBtn active={view === 'settings'} onClick={() => setView('settings')} label="Settings" icon={<Icon name="gear" />} />
               <DockBtn active={false} onClick={() => openRepo()} label="Open repository" icon={<Icon name="folder" />} />
             </div>
           </nav>
@@ -72,7 +77,7 @@ function Shell() {
 
           <main className="flex min-w-0 flex-1 flex-col gap-2">
             {view === 'editor' && <EditorTabs />}
-            {view === 'graph' ? <GraphView /> : view === 'changes' ? <ChangesView onOpenFile={openFile} /> : <EditorWorkspace />}
+            {view === 'graph' ? <GraphView /> : view === 'changes' ? <ChangesView onOpenFile={openFile} /> : view === 'languages' ? <StoreView /> : view === 'settings' ? <SettingsView /> : <EditorWorkspace />}
           </main>
         </div>
       </div>
@@ -139,10 +144,12 @@ function Welcome() {
 export default function App() {
   return (
     <StoreProvider>
-      <WorkspaceProvider>
-        <div className="cosmos" />
-        <Shell />
-      </WorkspaceProvider>
+      <SettingsProvider>
+        <WorkspaceProvider>
+          <div className="cosmos" />
+          <Shell />
+        </WorkspaceProvider>
+      </SettingsProvider>
     </StoreProvider>
   );
 }
