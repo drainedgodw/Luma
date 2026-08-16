@@ -142,3 +142,40 @@ describe('bisect flow', () => {
     expect(state.active).toBe(false);
   });
 });
+
+describe('stash drawer', () => {
+  it('push, list with stats, apply, drop', async () => {
+    await writeFile(join(repo, 'stashed.txt'), 'stash me\n');
+    await engine.stashPush(repo, 'test stash');
+    let list = await engine.stashList(repo);
+    expect(list.length).toBeGreaterThanOrEqual(1);
+    expect(list[0].message).toContain('test stash');
+    expect(list[0].files).toBeGreaterThanOrEqual(1);
+    // working tree clean again
+    const status = await engine.getStatus(repo);
+    expect(status.entries.some((e) => e.path === 'stashed.txt')).toBe(false);
+    await engine.stashApply(repo, list[0].ref);
+    const afterApply = await engine.getStatus(repo);
+    expect(afterApply.entries.some((e) => e.path === 'stashed.txt' && e.untracked)).toBe(true);
+    await engine.stashDrop(repo, list[0].ref);
+    list = await engine.stashList(repo);
+    expect(list.length).toBe(0);
+  });
+});
+
+describe('rescue reflog', () => {
+  it('lists entries and rewinds soft', async () => {
+    const before = await engine.reflog(repo);
+    expect(before.length).toBeGreaterThanOrEqual(1);
+    const log = await engine.getLog(repo);
+    const target = log[1]; // one commit back
+    await engine.rewindSoft(repo, target.hash);
+    const after = await engine.reflog(repo);
+    expect(after[0].summary).toContain('reset');
+    // restore
+    const original = log[0].hash;
+    await engine.rewindHard(repo, original);
+    const restored = await engine.getLog(repo);
+    expect(restored[0].hash).toBe(original);
+  });
+});

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StoreProvider, useStore } from './store';
 import { SettingsProvider, useSettings } from './settings';
 import { WorkspaceProvider, useWorkspace } from './workspace';
@@ -7,25 +7,30 @@ import ChangesView from './views/ChangesView';
 import EditorWorkspace from './views/EditorWorkspace';
 import SettingsView from './views/SettingsView';
 import StoreView from './views/StoreView';
+import RescueView from './views/RescueView';
 import FileTree from './components/FileTree';
 import { ExplorerWake } from './components/FileTree';
 import EditorTabs from './components/EditorTabs';
 import CommandLog from './components/CommandLog';
 import Toast from './components/Toast';
+import CommandPalette, { type Command } from './components/CommandPalette';
+import TerminalPanel from './components/TerminalPanel';
 import BisectView from './views/BisectView';
 import { Icon } from './components/Icons';
 import logo from './assets/logo.png';
-import { api as lumaApi } from './lib/api';
+import { api as lumaApi, gitCall } from './lib/api';
 
-type View = 'editor' | 'graph' | 'changes' | 'languages' | 'settings';
+type View = 'editor' | 'graph' | 'changes' | 'languages' | 'settings' | 'rescue';
 
 function Shell() {
-  const { repo, status, openRepo } = useStore();
+  const { repo, status, openRepo, refresh, setToast } = useStore();
   const { openFile } = useWorkspace();
+  const { settings, update } = useSettings();
   const [view, setView] = useState<View>('graph');
   const [showLog, setShowLog] = useState(false);
   const [explorerAwake, setExplorerAwake] = useState(false);
-  const { settings, update } = useSettings();
+  const [showPalette, setShowPalette] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
   const pinned = settings.explorer === 'pinned';
 
   useEffect(() => {
@@ -36,6 +41,54 @@ function Shell() {
     window.addEventListener('luma:open-file', onOpenFile);
     return () => window.removeEventListener('luma:open-file', onOpenFile);
   }, [openFile]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.ctrlKey || e.metaKey;
+      if (mod && e.shiftKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        setShowPalette((v) => !v);
+      } else if (mod && e.key === '`') {
+        e.preventDefault();
+        setShowTerminal((v) => !v);
+      } else if (mod && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        update({ explorer: settings.explorer === 'pinned' ? 'auto' : 'pinned' });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [settings.explorer, update]);
+
+  const commands: Command[] = useMemo(() => {
+    const cmd = (id: string, label: string, group: string, run: () => void | Promise<void>, hint?: string): Command => ({ id, label, group, run, hint });
+    const gitAction = (label: string, fn: () => Promise<unknown>, group = 'Git') =>
+      cmd(`git-${label}`, label, group, async () => {
+        await fn();
+        await refresh();
+      });
+    return [
+      cmd('view-editor', 'Go to Editor', 'View', () => setView('editor')),
+      cmd('view-graph', 'Go to Commit History', 'View', () => setView('graph')),
+      cmd('view-changes', 'Go to Changes', 'View', () => setView('changes')),
+      cmd('view-languages', 'Go to Languages', 'View', () => setView('languages')),
+      cmd('view-settings', 'Go to Settings', 'View', () => setView('settings')),
+      cmd('view-rescue', 'Go to Rescue (reflog)', 'View', () => setView('rescue')),
+      cmd('toggle-terminal', 'Toggle Terminal', 'View', () => setShowTerminal((v) => !v), 'Ctrl+`'),
+      cmd('toggle-sidebar', 'Toggle Sidebar', 'View', () => update({ explorer: settings.explorer === 'pinned' ? 'auto' : 'pinned' }), 'Ctrl+B'),
+      cmd('toggle-theme', `Switch theme (now: ${settings.theme === 'cosmos' ? 'Cosmos' : 'Liquid Glass'})`, 'View', () => update({ theme: settings.theme === 'cosmos' ? 'liquid' : 'cosmos' })),
+      cmd('open-repo', 'Open Repository…', 'File', () => openRepo()),
+      gitAction('Fetch from origin', () => gitCall('fetch', 'origin')),
+      gitAction('Pull (rebase)', () => gitCall('pull')),
+      gitAction('Push', () => gitCall('push', !status?.upstream)),
+      gitAction('Stage all changes', () => gitCall('stageAll')),
+      gitAction('Stash current changes', () => gitCall('stashPush')),
+      gitAction('Pop latest stash', () => gitCall('stashPop')),
+      gitAction('Abort merge', () => gitCall('mergeAbort'), 'Recovery'),
+      gitAction('Abort rebase', () => gitCall('rebaseAbort'), 'Recovery'),
+      gitAction('Reset bisect', () => gitCall('bisectReset'), 'Recovery'),
+    ];
+  }, [openRepo, refresh, status?.upstream, settings.explorer, settings.theme, update]);
 
   if (!repo) return <Welcome />;
 
@@ -63,8 +116,8 @@ function Shell() {
         )}
         <div className="flex-1" />
         <div style={{ WebkitAppRegion: 'no-drag' } as never} className="flex items-center gap-2">
-          <button className="btn text-xs" title="Show the git commands Luma runs for you" onClick={() => setShowLog((v) => !v)}>Commands</button>
-          <button className="btn text-xs" title="Open another repository" onClick={() => openRepo()}>Open…</button>
+          <button className="btn text-xs" title="Command palette" onClick={() => setShowPalette(true)}>⌘ Commands</button>
+          <button className="btn text-xs" title="Show the git commands Luma runs for you" onClick={() => setShowLog((v) => !v)}>Log</button>
           <div className="ml-1 flex items-center">
             <WinBtn title="Minimize" onClick={() => lumaApi.winMin()}>─</WinBtn>
             <WinBtn title="Maximize" onClick={() => lumaApi.winMax()}>▢</WinBtn>
@@ -88,6 +141,8 @@ function Shell() {
             <DockBtn active={view === 'editor'} onClick={() => setView('editor')} label="Editor" icon={<Icon name="code" />} />
             <DockBtn active={view === 'graph'} onClick={() => setView('graph')} label="History" icon={<Icon name="graph" />} />
             <DockBtn active={view === 'changes'} onClick={() => setView('changes')} label="Changes" icon={<Icon name="changes" />} badge={dirtyCount > 0 ? String(dirtyCount > 99 ? '99+' : dirtyCount) : null} />
+            <DockBtn active={showTerminal} onClick={() => setShowTerminal((v) => !v)} label="Terminal (Ctrl+`)" icon={<Icon name="terminal" />} />
+            <DockBtn active={view === 'rescue'} onClick={() => setView('rescue')} label="Rescue — undo anything" icon={<Icon name="shield" />} />
             <DockBtn active={view === 'languages'} onClick={() => setView('languages')} label="Languages" icon={<Icon name="grid" />} />
             <div className="mt-auto flex flex-col gap-1.5">
               <DockBtn active={view === 'settings'} onClick={() => setView('settings')} label="Settings" icon={<Icon name="gear" />} />
@@ -96,15 +151,25 @@ function Shell() {
           </nav>
 
           <ExplorerWake onWake={() => setExplorerAwake(true)} enabled={!pinned} />
-          <FileTree awake={pinned || explorerAwake} onCollapse={() => setExplorerAwake(false)} />
+          <FileTree awake={explorerAwake} onCollapse={() => setExplorerAwake(false)} />
 
           <main className="flex min-w-0 flex-1 flex-col gap-2">
             {view === 'editor' && <EditorTabs />}
-            {view === 'graph' ? <GraphView /> : view === 'changes' ? <ChangesView onOpenFile={openFile} /> : view === 'languages' ? <StoreView /> : view === 'settings' ? <SettingsView /> : <EditorWorkspace />}
+            <div className={`min-h-0 flex-1 ${showTerminal ? 'flex flex-col gap-2' : 'flex flex-col'}`}>
+              <div className="min-h-0 flex-1">
+                {view === 'graph' ? <GraphView /> : view === 'changes' ? <ChangesView onOpenFile={openFile} /> : view === 'languages' ? <StoreView /> : view === 'settings' ? <SettingsView /> : view === 'rescue' ? <RescueView /> : <EditorWorkspace />}
+              </div>
+              {showTerminal && (
+                <div className="h-[38%] min-h-[160px]">
+                  <TerminalPanel onClose={() => setShowTerminal(false)} />
+                </div>
+              )}
+            </div>
           </main>
         </div>
       </div>
 
+      {showPalette && <CommandPalette commands={commands} onClose={() => setShowPalette(false)} />}
       {showLog && <CommandLog onClose={() => setShowLog(false)} />}
       {status?.state === 'bisect' && <BisectView active onClose={() => {}} />}
       <Toast />

@@ -64,6 +64,18 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M9 3h6l-1 7 3 3H7l3-3-1-7z" />
     </svg>
   ),
+  terminal: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 17l5-5-5-5" />
+      <path d="M12 17h8" />
+    </svg>
+  ),
+  shield: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3l7 3v5c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z" />
+      <path d="M9.5 12l1.8 1.8 3.2-3.6" />
+    </svg>
+  ),
   close: (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <path d="M5 5l14 14M19 5L5 19" />

@@ -2,6 +2,7 @@ import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import * as engine from './git/engine';
+import { registerTerminal } from './terminal';
 
 export function registerIpc(getWindow: () => BrowserWindow | null) {
   const repo = (): string | null => {
@@ -93,8 +94,13 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   on('git:resolveConflict', (p: string, c: string, t: string) => `write ${p}; git add ${p}`, (p, c, t) => engine.resolveConflict(needRepo(), p, c, t as 'ours' | 'theirs' | 'both' | 'custom'));
   on('git:remotes', () => `git remote`, () => engine.getRemotes(needRepo()));
   on('git:stashPush', (m?: string) => `git stash push`, (m) => engine.stashPush(needRepo(), m));
-  on('git:stashPop', () => `git stash pop`, () => engine.stashPop(needRepo()));
+  on('git:stashPop', (r?: string) => `git stash pop ${r ?? ''}`.trim(), (r) => engine.stashPop(needRepo(), r));
+  on('git:stashApply', (r: string) => `git stash apply ${r}`, (r) => engine.stashApply(needRepo(), r));
+  on('git:stashDrop', (r: string) => `git stash drop ${r}`, (r) => engine.stashDrop(needRepo(), r));
   on('git:stashList', () => `git stash list`, () => engine.stashList(needRepo()));
+  on('git:reflog', () => `git reflog`, () => engine.reflog(needRepo()));
+  on('git:rewindHard', (r: string) => `git reset --hard ${r}`, (r) => engine.rewindHard(needRepo(), r));
+  on('git:rewindSoft', (r: string) => `git reset --soft ${r}`, (r) => engine.rewindSoft(needRepo(), r));
 
   ipcMain.handle('fs:read', async (_e, p: string) => {
     try {
@@ -129,4 +135,6 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   ipcMain.on('shell:openExternal', (_e, url: string) => {
     if (typeof url === 'string' && /^https?:\/\//.test(url)) shell.openExternal(url);
   });
+
+  registerTerminal(getWindow, repo);
 }

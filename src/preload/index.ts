@@ -16,6 +16,16 @@ contextBridge.exposeInMainWorld('luma', {
   winMax: () => ipcRenderer.send('win:max'),
   winClose: () => ipcRenderer.send('win:close'),
   wallpaper: () => ipcRenderer.invoke('wallpaper:get'),
+  termCreate: (id: string) => ipcRenderer.send('term:create', id),
+  termWrite: (id: string, data: string) => ipcRenderer.send('term:write', id, data),
+  termResize: (id: string, cols: number, rows: number) => ipcRenderer.send('term:resize', id, cols, rows),
+  termKill: (id: string) => ipcRenderer.send('term:kill', id),
+  termOnData: (id: string, cb: (data: string) => void) => {
+    ipcRenderer.on(`term:data:${id}`, (_e, data) => cb(data));
+  },
+  termOnExit: (id: string, cb: () => void) => {
+    ipcRenderer.on(`term:exit:${id}`, () => cb());
+  },
 });
 
 export type LumaApi = {

@@ -18,6 +18,12 @@ interface LumaApi {
   winMax(): void;
   winClose(): void;
   wallpaper(): Promise<string | null>;
+  termCreate(id: string): void;
+  termWrite(id: string, data: string): void;
+  termResize(id: string, cols: number, rows: number): void;
+  termKill(id: string): void;
+  termOnData(id: string, cb: (data: string) => void): void;
+  termOnExit(id: string, cb: () => void): void;
 }
 
 export const api: LumaApi = (window as unknown as { luma: LumaApi }).luma;

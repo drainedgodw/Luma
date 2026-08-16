@@ -21,6 +21,10 @@ Luma is an open-source, Git-first IDE for Linux (Arch first, everyone else next)
 - **Detective mode** — a guided `git bisect`: Luma checks out suspects, you answer *Works* / *Broken*, it halves the search.
 - **Rebase, visualized** — start a rebase onto any branch, continue or abort, all from the graph toolbar.
 - **Honest by design** — a Commands panel shows every `git …` invocation Luma runs on your behalf.
+- **Command palette** (`Ctrl+Shift+P`) — every action of the IDE, from the keyboard.
+- **Built-in terminal** (`Ctrl+\``) — a real shell, in the repo directory, one keystroke away.
+- **Stash drawer** — stashes as cards with +/− stats; apply, pop or drop in one click.
+- **Rescue panel** — the full reflog as a timeline: jump back to any moment, soft or hard, with confirmation.
 - **Light shell** — Electron with a single-digit-MB renderer, Tailwind 4, CodeMirror 6 editor, glassmorphism kept GPU-cheap.
 
 ## Install
