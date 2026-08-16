@@ -21,7 +21,7 @@ const DEFAULTS: Settings = {
   wordWrap: false,
   theme: 'cosmos',
   installedPacks: ['typescript', 'javascript'],
-  explorer: 'pinned',
+  explorer: 'auto',
 };
 
 const KEY = 'luma.settings';
@@ -41,19 +41,23 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
+  const update = (patch: Partial<Settings>) => setSettings((s) => ({ ...s, ...patch }));
+
   useEffect(() => {
     localStorage.setItem(KEY, JSON.stringify(settings));
     document.documentElement.classList.toggle('reduce-motion', settings.reduceMotion);
     document.documentElement.dataset.theme = settings.theme;
   }, [settings]);
 
+  // allow the host to force a theme (used by visual test harness)
+  useEffect(() => {
+    const on = (e: Event) => update({ theme: (e as CustomEvent<'cosmos' | 'liquid'>).detail });
+    window.addEventListener('luma:theme', on);
+    return () => window.removeEventListener('luma:theme', on);
+  });
+
   return (
-    <Ctx.Provider
-      value={{
-        settings,
-        update: (patch) => setSettings((s) => ({ ...s, ...patch })),
-      }}
-    >
+    <Ctx.Provider value={{ settings, update }}>
       {children}
     </Ctx.Provider>
   );

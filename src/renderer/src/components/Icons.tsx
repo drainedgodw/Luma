@@ -58,6 +58,12 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M9.5 4.5v15" />
     </svg>
   ),
+  pin: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 17v5" />
+      <path d="M9 3h6l-1 7 3 3H7l3-3-1-7z" />
+    </svg>
+  ),
   close: (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <path d="M5 5l14 14M19 5L5 19" />
