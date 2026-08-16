@@ -7,6 +7,8 @@ export interface Settings {
   showCommandsOnAction: boolean;
   reduceMotion: boolean;
   wordWrap: boolean;
+  theme: 'cosmos' | 'liquid';
+  installedPacks: string[];
 }
 
 const DEFAULTS: Settings = {
@@ -16,6 +18,8 @@ const DEFAULTS: Settings = {
   showCommandsOnAction: true,
   reduceMotion: false,
   wordWrap: false,
+  theme: 'cosmos',
+  installedPacks: ['typescript', 'javascript'],
 };
 
 const KEY = 'luma.settings';
@@ -38,6 +42,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     localStorage.setItem(KEY, JSON.stringify(settings));
     document.documentElement.classList.toggle('reduce-motion', settings.reduceMotion);
+    document.documentElement.dataset.theme = settings.theme;
   }, [settings]);
 
   return (

@@ -41,7 +41,29 @@ export default function SettingsView() {
 
           <section>
             <h2 className="mb-1 text-sm font-semibold text-white/85">Appearance</h2>
-            <p className="mb-3 text-xs text-white/35">Motion and visual effects.</p>
+            <p className="mb-3 text-xs text-white/35">Theme and motion.</p>
+            <div className="mb-3 grid grid-cols-2 gap-3">
+              {(['cosmos', 'liquid'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => update({ theme: t })}
+                  className={`rounded-xl border p-3 text-left transition-all duration-200 ${
+                    settings.theme === t ? 'border-lilac/60 bg-lilac/10' : 'border-white/10 hover:border-white/25'
+                  }`}
+                >
+                  <div
+                    className="mb-2 h-14 rounded-lg border"
+                    style={
+                      t === 'cosmos'
+                        ? { background: 'radial-gradient(400px 200px at 20% 0%, rgba(139,92,246,.35), transparent 60%), radial-gradient(400px 300px at 100% 100%, rgba(45,212,191,.25), transparent 60%), #07070e', borderColor: 'rgba(196,181,253,.3)' }
+                        : { background: 'radial-gradient(400px 200px at 15% 0%, rgba(125,211,252,.4), transparent 60%), radial-gradient(400px 300px at 100% 100%, rgba(165,243,252,.25), transparent 55%), #0a1322', borderColor: 'rgba(186,230,253,.3)' }
+                    }
+                  />
+                  <div className="text-[13px] text-white/85">{t === 'cosmos' ? 'Cosmos' : 'Liquid Glass'}</div>
+                  <div className="text-[11px] text-white/35">{t === 'cosmos' ? 'Deep space, violet nebulae — the default' : 'Frosted aqua glass, brighter translucency'}</div>
+                </button>
+              ))}
+            </div>
             <Toggle label="Reduce motion" hint="Disable pulsing and animated effects" value={settings.reduceMotion} onChange={(v) => update({ reduceMotion: v })} />
           </section>
 
