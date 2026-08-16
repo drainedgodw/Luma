@@ -24,7 +24,7 @@ function Shell() {
   const [view, setView] = useState<View>('graph');
   const [showLog, setShowLog] = useState(false);
   const [explorerAwake, setExplorerAwake] = useState(false);
-  const { settings, update } = useSettings();
+  const { settings } = useSettings();
   const pinned = settings.explorer === 'pinned';
 
   useEffect(() => {
@@ -73,12 +73,6 @@ function Shell() {
           <nav className="glass flex w-14 flex-col items-center gap-1.5 py-3">
             <img src={logo} alt="Luma" className="mb-1 h-8 w-8 rounded-xl" style={{ filter: 'drop-shadow(0 0 8px rgba(196,181,253,.4))' }} />
             <div className="mb-1 h-px w-8 bg-white/10" />
-            <DockBtn
-              active={pinned}
-              onClick={() => update({ explorer: pinned ? 'auto' : 'pinned' })}
-              label={pinned ? 'Explorer: pinned — click to make it slide out on hover' : 'Explorer: slides out on hover — click to pin'}
-              icon={<Icon name="panel" />}
-            />
             <DockBtn active={view === 'editor'} onClick={() => setView('editor')} label="Editor" icon={<Icon name="code" />} />
             <DockBtn active={view === 'graph'} onClick={() => setView('graph')} label="History" icon={<Icon name="graph" />} />
             <DockBtn active={view === 'changes'} onClick={() => setView('changes')} label="Changes" icon={<Icon name="changes" />} badge={dirtyCount > 0 ? String(dirtyCount > 99 ? '99+' : dirtyCount) : null} />
