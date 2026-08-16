@@ -12,6 +12,10 @@ contextBridge.exposeInMainWorld('luma', {
   onCommand: (cb: (entry: { id: number; command: string; at: number }) => void) => {
     ipcRenderer.on('git:command', (_e, entry) => cb(entry));
   },
+  winMin: () => ipcRenderer.send('win:min'),
+  winMax: () => ipcRenderer.send('win:max'),
+  winClose: () => ipcRenderer.send('win:close'),
+  wallpaper: () => ipcRenderer.invoke('wallpaper:get'),
 });
 
 export type LumaApi = {

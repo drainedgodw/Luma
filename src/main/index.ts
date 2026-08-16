@@ -1,6 +1,7 @@
-import { BrowserWindow, app } from 'electron';
+import { BrowserWindow, app, ipcMain } from 'electron';
 import { join } from 'node:path';
 import { registerIpc } from './ipc';
+import { getWallpaper } from './wallpaper';
 
 let win: BrowserWindow | null = null;
 
@@ -11,10 +12,9 @@ function createWindow() {
     minWidth: 960,
     minHeight: 600,
     show: false,
-    frame: true,
-    backgroundColor: '#07070e',
-    titleBarStyle: 'hidden',
-    titleBarOverlay: process.platform === 'linux' ? false : { color: '#07070e', symbolColor: '#c4b5fd' },
+    frame: false,
+    transparent: true,
+    backgroundColor: '#00000000',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -22,16 +22,17 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
-  if (process.env.LUMA_THEME) {
-    const theme = process.env.LUMA_THEME;
-    win.webContents.on('did-finish-load', () => {
-      win!.webContents
-        .executeJavaScript(`window.dispatchEvent(new CustomEvent('luma:theme', { detail: ${JSON.stringify(theme)} }))`)
-        .catch(() => {});
-    });
-  }
-
   win.on('ready-to-show', () => win?.show());
+  win.on('closed', () => (win = null));
+
+  ipcMain.on('win:min', () => win?.minimize());
+  ipcMain.on('win:max', () => {
+    if (win?.isMaximized()) win.unmaximize();
+    else win?.maximize();
+  });
+  ipcMain.on('win:close', () => win?.close());
+  ipcMain.handle('wallpaper:get', () => getWallpaper());
+
   if (process.env.LUMA_REPO) {
     (win as BrowserWindow & { __repo?: string }).__repo = process.env.LUMA_REPO;
     win.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent('luma:open', { detail: ${JSON.stringify(process.env.LUMA_REPO)} }))`).catch(() => {});
@@ -42,6 +43,16 @@ function createWindow() {
       ).catch(() => {});
     }
   }
+
+  if (process.env.LUMA_THEME) {
+    const theme = process.env.LUMA_THEME;
+    win.webContents.on('did-finish-load', () => {
+      win!.webContents
+        .executeJavaScript(`window.dispatchEvent(new CustomEvent('luma:theme', { detail: ${JSON.stringify(theme)} }))`)
+        .catch(() => {});
+    });
+  }
+
   if (process.env.LUMA_SHOT) {
     setTimeout(async () => {
       const image = await win!.webContents.capturePage();
@@ -51,13 +62,12 @@ function createWindow() {
       app.quit();
     }, 4000);
   }
-  win.on('closed', () => (win = null));
+
   if (process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(process.env.ELECTRON_RENDERER_URL);
   } else {
     win.loadFile(join(__dirname, '../renderer/index.html'));
   }
-  // Wayland/X11: Electron 28+ picks ozone automatically when available
 }
 
 app.whenReady().then(() => {

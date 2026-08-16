@@ -14,6 +14,10 @@ interface LumaApi {
   fsWrite(p: string, c: string): Promise<GitResult<null>>;
   fsList(p: string): Promise<GitResult<{ name: string; dir: boolean }[]>>;
   onCommand(cb: (e: { id: number; command: string; at: number }) => void): void;
+  winMin(): void;
+  winMax(): void;
+  winClose(): void;
+  wallpaper(): Promise<string | null>;
 }
 
 export const api: LumaApi = (window as unknown as { luma: LumaApi }).luma;
