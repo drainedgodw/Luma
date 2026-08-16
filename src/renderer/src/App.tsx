@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StoreProvider, useStore } from './store';
 import { SettingsProvider } from './settings';
 import { WorkspaceProvider, useWorkspace } from './workspace';
@@ -13,6 +13,7 @@ import CommandLog from './components/CommandLog';
 import Toast from './components/Toast';
 import BisectView from './views/BisectView';
 import { Icon } from './components/Icons';
+import logo from './assets/logo.png';
 
 type View = 'editor' | 'graph' | 'changes' | 'languages' | 'settings';
 
@@ -20,8 +21,16 @@ function Shell() {
   const { repo, status, openRepo } = useStore();
   const { openFile } = useWorkspace();
   const [view, setView] = useState<View>('graph');
-  const [showTree, setShowTree] = useState(true);
   const [showLog, setShowLog] = useState(false);
+
+  useEffect(() => {
+    const onOpenFile = (e: Event) => {
+      openFile((e as CustomEvent<string>).detail);
+      setView('editor');
+    };
+    window.addEventListener('luma:open-file', onOpenFile);
+    return () => window.removeEventListener('luma:open-file', onOpenFile);
+  }, [openFile]);
 
   if (!repo) return <Welcome />;
 
@@ -31,12 +40,8 @@ function Shell() {
     <div className="relative flex h-full w-full flex-col">
       {/* Title bar */}
       <header className="glass mx-3 mt-3 flex h-12 items-center gap-3 px-4" style={{ WebkitAppRegion: 'drag' } as never}>
-        <div className="flex items-center gap-1.5">
-          <TrafficLight color="#f56565" />
-          <TrafficLight color="#ecc94b" />
-          <TrafficLight color="#68d391" />
-        </div>
-        <span className="ml-2 text-[14px] font-bold tracking-[0.25em] text-lilac">LUMA</span>
+        <img src={logo} alt="" className="h-7 w-7 rounded-lg" style={{ filter: 'drop-shadow(0 0 10px rgba(196,181,253,.45))' }} />
+        <span className="text-[14px] font-bold tracking-[0.25em] text-lilac">LUMA</span>
         <span className="text-white/20">/</span>
         <span className="truncate font-mono text-xs text-white/60">{repo.split('/').pop()}</span>
         {status?.branch && (
@@ -53,7 +58,6 @@ function Shell() {
         )}
         <div className="flex-1" />
         <div style={{ WebkitAppRegion: 'no-drag' } as never} className="flex items-center gap-2">
-          <button className="btn text-xs" title="Show or hide the file explorer (Ctrl+B)" onClick={() => setShowTree((v) => !v)}>Explorer</button>
           <button className="btn text-xs" title="Show the git commands Luma runs for you" onClick={() => setShowLog((v) => !v)}>Commands</button>
           <button className="btn text-xs" title="Open another repository" onClick={() => openRepo()}>Open…</button>
         </div>
@@ -63,6 +67,8 @@ function Shell() {
         <div className="flex min-h-0 flex-1 gap-3">
           {/* Dock */}
           <nav className="glass flex w-14 flex-col items-center gap-1.5 py-3">
+            <img src={logo} alt="Luma" className="mb-1 h-8 w-8 rounded-xl" style={{ filter: 'drop-shadow(0 0 8px rgba(196,181,253,.4))' }} />
+            <div className="mb-1 h-px w-8 bg-white/10" />
             <DockBtn active={view === 'editor'} onClick={() => setView('editor')} label="Editor" icon={<Icon name="code" />} />
             <DockBtn active={view === 'graph'} onClick={() => setView('graph')} label="History" icon={<Icon name="graph" />} />
             <DockBtn active={view === 'changes'} onClick={() => setView('changes')} label="Changes" icon={<Icon name="changes" />} badge={dirtyCount > 0 ? String(dirtyCount > 99 ? '99+' : dirtyCount) : null} />
@@ -73,7 +79,7 @@ function Shell() {
             </div>
           </nav>
 
-          {showTree && <FileTree />}
+          <FileTree />
 
           <main className="flex min-w-0 flex-1 flex-col gap-2">
             {view === 'editor' && <EditorTabs />}
@@ -87,10 +93,6 @@ function Shell() {
       <Toast />
     </div>
   );
-}
-
-function TrafficLight({ color }: { color: string }) {
-  return <span className="block h-3 w-3 rounded-full" style={{ background: color, boxShadow: `0 0 8px ${color}66` }} />;
 }
 
 function DockBtn({ active, onClick, label, icon, badge }: { active: boolean; onClick: () => void; label: string; icon: React.ReactNode; badge?: string | null }) {
@@ -121,7 +123,8 @@ function Welcome() {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-8">
       <div className="text-center">
-        <h1 className="text-5xl font-bold tracking-[0.3em] text-lilac" style={{ textShadow: '0 0 40px rgba(196,181,253,.5)' }}>LUMA</h1>
+        <img src={logo} alt="" className="mx-auto h-24 w-24 rounded-3xl" style={{ filter: 'drop-shadow(0 0 30px rgba(196,181,253,.55))' }} />
+        <h1 className="mt-4 text-5xl font-bold tracking-[0.3em] text-lilac" style={{ textShadow: '0 0 40px rgba(196,181,253,.5)' }}>LUMA</h1>
         <p className="mt-3 text-white/50">See your Git. No commands required.</p>
       </div>
       <button className="btn btn-primary px-8 py-3 text-sm" onClick={() => openRepo()}>
