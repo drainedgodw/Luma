@@ -26,6 +26,12 @@ function createWindow() {
   if (process.env.LUMA_REPO) {
     (win as BrowserWindow & { __repo?: string }).__repo = process.env.LUMA_REPO;
     win.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent('luma:open', { detail: ${JSON.stringify(process.env.LUMA_REPO)} }))`).catch(() => {});
+    if (process.env.LUMA_OPEN_FILE) {
+      const file = JSON.stringify(process.env.LUMA_OPEN_FILE);
+      win.webContents.executeJavaScript(
+        `setTimeout(() => window.dispatchEvent(new CustomEvent('luma:open-file', { detail: ${file} })), 800)`,
+      ).catch(() => {});
+    }
   }
   if (process.env.LUMA_SHOT) {
     setTimeout(async () => {
