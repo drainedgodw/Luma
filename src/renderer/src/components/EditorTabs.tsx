@@ -10,6 +10,7 @@ export default function EditorTabs() {
         <div
           key={t.path}
           onClick={() => setActive(t.path)}
+          title={t.path}
           className={`group flex shrink-0 cursor-pointer items-center gap-2 rounded-lg px-3 py-1.5 text-xs transition-all duration-150 ${
             active === t.path ? 'bg-lilac/15 text-white/90 shadow-[inset_0_0_0_1px_rgba(196,181,253,0.25)]' : 'text-white/50 hover:bg-white/5'
           }`}
