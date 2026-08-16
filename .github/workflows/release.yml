@@ -1,0 +1,60 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Package (AppImage + tar.gz)
+        run: npx electron-builder --linux AppImage tar.gz --publish never
+        env:
+          # use system electron downloads
+          ELECTRON_BUILDER_CACHE: .cache/electron-builder
+      - name: Compute checksums
+        run: cd dist && sha256sum *.AppImage *.tar.gz > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: luma-linux
+          path: dist/
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.AppImage
+            dist/*.tar.gz
+            dist/SHA256SUMS.txt
+          generate_release_notes: true
+
+  publish-aur:
+    needs: build-linux
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Update AUR luma-bin
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          AUR_USER: ${{ secrets.AUR_USER }}
+          AUR_EMAIL: ${{ secrets.AUR_EMAIL }}
+        run: |
+          eval "$(ssh-agent -s)"
+          echo "$AUR_SSH_PRIVATE_KEY" | ssh-add -
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
+          git config --global user.name "$AUR_USER"
+          git config --global user.email "$AUR_EMAIL"
+          .github/scripts/update-aur.sh "${GITHUB_REF_NAME#v}"

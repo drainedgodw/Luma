@@ -1,0 +1,52 @@
+# Maintainer: Luma contributors <https://github.com/drainedgodw/Luma>
+pkgname=luma-git
+pkgver=r0.0.1
+pkgrel=1
+pkgdesc='Luma — a visual Git-first IDE (built from source)'
+arch=('x86_64')
+url='https://github.com/drainedgodw/Luma'
+license=('MIT')
+makedepends=('git' 'npm' 'nodejs' 'electron33' 'imagemagick')
+depends=('electron33' 'git' 'nss' 'atk' 'at-spi2-atk' 'libcups' 'libdrm' 'libxkbcommon' 'libxrandr' 'libxcomposite' 'libxdamage' 'pango' 'alsa-lib' 'mesa')
+provides=('luma')
+conflicts=('luma' 'luma-bin')
+source=('luma::git+https://github.com/drainedgodw/Luma.git')
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$srcdir/luma"
+  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+  cd "$srcdir/luma"
+  npm ci --no-audit --no-fund
+  npm run build
+}
+
+package() {
+  cd "$srcdir/luma"
+  install -Dm644 out/main/index.js "$pkgdir/usr/lib/luma/app/main/index.js"
+  cp -r out/preload "$pkgdir/usr/lib/luma/app/preload"
+  cp -r out/renderer "$pkgdir/usr/lib/luma/app/renderer"
+  install -Dm644 package.json "$pkgdir/usr/lib/luma/app/package.json"
+
+  # launcher uses system electron
+  cat > "$pkgdir/usr/bin/luma" <<EOF
+#!/bin/sh
+exec electron33 /usr/lib/luma/app "\$@"
+EOF
+  chmod 755 "$pkgdir/usr/bin/luma"
+
+  install -Dm644 /dev/null "$pkgdir/usr/share/applications/luma.desktop"
+  cat > "$pkgdir/usr/share/applications/luma.desktop" <<DESKTOP
+[Desktop Entry]
+Name=Luma
+Comment=Visual Git-first IDE
+Exec=/usr/bin/luma --ozone-platform-hint=auto %U
+Type=Application
+Categories=Development;RevisionControl;
+Icon=luma
+StartupWMClass=Luma
+DESKTOP
+}
