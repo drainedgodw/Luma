@@ -56,11 +56,11 @@ export default function SettingsView() {
                     style={
                       t === 'cosmos'
                         ? { background: 'radial-gradient(400px 200px at 20% 0%, rgba(139,92,246,.35), transparent 60%), radial-gradient(400px 300px at 100% 100%, rgba(45,212,191,.25), transparent 60%), #07070e', borderColor: 'rgba(196,181,253,.3)' }
-                        : { background: 'radial-gradient(400px 200px at 15% 0%, rgba(125,211,252,.4), transparent 60%), radial-gradient(400px 300px at 100% 100%, rgba(165,243,252,.25), transparent 55%), #0a1322', borderColor: 'rgba(186,230,253,.3)' }
+                        : { background: 'linear-gradient(120deg, rgba(255,255,255,.14), rgba(255,255,255,.05) 60%), #0c0c11', borderColor: 'rgba(255,255,255,.25)' }
                     }
                   />
                   <div className="text-[13px] text-white/85">{t === 'cosmos' ? 'Cosmos' : 'Liquid Glass'}</div>
-                  <div className="text-[11px] text-white/35">{t === 'cosmos' ? 'Deep space, violet nebulae — the default' : 'Frosted aqua glass, brighter translucency'}</div>
+                  <div className="text-[11px] text-white/35">{t === 'cosmos' ? 'Deep space, violet nebulae — the default' : 'Neutral frosted glass, iOS-style blur'}</div>
                 </button>
               ))}
             </div>
