@@ -15,6 +15,7 @@ import Toast from './components/Toast';
 import BisectView from './views/BisectView';
 import { Icon } from './components/Icons';
 import logo from './assets/logo.png';
+import { api as lumaApi } from './lib/api';
 
 type View = 'editor' | 'graph' | 'changes' | 'languages' | 'settings';
 
@@ -24,7 +25,7 @@ function Shell() {
   const [view, setView] = useState<View>('graph');
   const [showLog, setShowLog] = useState(false);
   const [explorerAwake, setExplorerAwake] = useState(false);
-  const { settings } = useSettings();
+  const { settings, update } = useSettings();
   const pinned = settings.explorer === 'pinned';
 
   useEffect(() => {
@@ -64,6 +65,11 @@ function Shell() {
         <div style={{ WebkitAppRegion: 'no-drag' } as never} className="flex items-center gap-2">
           <button className="btn text-xs" title="Show the git commands Luma runs for you" onClick={() => setShowLog((v) => !v)}>Commands</button>
           <button className="btn text-xs" title="Open another repository" onClick={() => openRepo()}>Open…</button>
+          <div className="ml-1 flex items-center">
+            <WinBtn title="Minimize" onClick={() => lumaApi.winMin()}>─</WinBtn>
+            <WinBtn title="Maximize" onClick={() => lumaApi.winMax()}>▢</WinBtn>
+            <WinBtn title="Close" onClick={() => lumaApi.winClose()} danger>✕</WinBtn>
+          </div>
         </div>
       </header>
 
@@ -73,6 +79,12 @@ function Shell() {
           <nav className="glass flex w-14 flex-col items-center gap-1.5 py-3">
             <img src={logo} alt="Luma" className="mb-1 h-8 w-8 rounded-xl" style={{ filter: 'drop-shadow(0 0 8px rgba(196,181,253,.4))' }} />
             <div className="mb-1 h-px w-8 bg-white/10" />
+            <DockBtn
+              active={pinned}
+              onClick={() => update({ explorer: pinned ? 'auto' : 'pinned' })}
+              label={pinned ? 'Hide sidebar (slides out on hover)' : 'Show sidebar permanently'}
+              icon={<Icon name="panel" />}
+            />
             <DockBtn active={view === 'editor'} onClick={() => setView('editor')} label="Editor" icon={<Icon name="code" />} />
             <DockBtn active={view === 'graph'} onClick={() => setView('graph')} label="History" icon={<Icon name="graph" />} />
             <DockBtn active={view === 'changes'} onClick={() => setView('changes')} label="Changes" icon={<Icon name="changes" />} badge={dirtyCount > 0 ? String(dirtyCount > 99 ? '99+' : dirtyCount) : null} />
@@ -97,6 +109,20 @@ function Shell() {
       {status?.state === 'bisect' && <BisectView active onClose={() => {}} />}
       <Toast />
     </div>
+  );
+}
+
+function WinBtn({ title, onClick, children, danger }: { title: string; onClick: () => void; children: React.ReactNode; danger?: boolean }) {
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      className={`flex h-8 w-9 items-center justify-center rounded-lg text-[11px] transition-colors ${
+        danger ? 'text-white/60 hover:bg-rose hover:text-white' : 'text-white/60 hover:bg-white/10 hover:text-white'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
 
@@ -154,10 +180,26 @@ export default function App() {
     <StoreProvider>
       <SettingsProvider>
         <WorkspaceProvider>
+          <Wallpaper />
           <div className="cosmos" />
           <Shell />
         </WorkspaceProvider>
       </SettingsProvider>
     </StoreProvider>
   );
+}
+
+/** Liquid theme renders the user's real desktop wallpaper under everything. */
+function Wallpaper() {
+  const { settings } = useSettings();
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (settings.theme === 'liquid') {
+      import('./lib/api').then(({ api }) => api.wallpaper().then((u) => setUrl(u)));
+    } else {
+      setUrl(null);
+    }
+  }, [settings.theme]);
+  if (!url) return null;
+  return <div className="wallpaper" style={{ backgroundImage: `url(${url})` }} />;
 }
