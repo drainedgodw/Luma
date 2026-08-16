@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('luma', {
   fsRead: (p: string) => ipcRenderer.invoke('fs:read', p),
   fsWrite: (p: string, content: string) => ipcRenderer.invoke('fs:write', p, content),
   fsList: (p: string) => ipcRenderer.invoke('fs:list', p),
+  fsNewFile: (parent: string, name: string) => ipcRenderer.invoke('fs:newFile', parent, name),
+  fsNewDir: (parent: string, name: string) => ipcRenderer.invoke('fs:newDir', parent, name),
   onCommand: (cb: (entry: { id: number; command: string; at: number }) => void) => {
     ipcRenderer.on('git:command', (_e, entry) => cb(entry));
   },

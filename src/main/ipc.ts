@@ -132,6 +132,29 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     }
   });
 
+  ipcMain.handle('fs:newFile', async (_e, parent: string, name: string) => {
+    try {
+      const target = join(needRepo(), parent ? `${parent}/${name}` : name);
+      if (await fs.stat(target).then(() => true).catch(() => false)) {
+        return { ok: false, error: { message: 'Already exists', stderr: '' } };
+      }
+      await fs.writeFile(target, '');
+      return { ok: true, data: target };
+    } catch (err) {
+      return { ok: false, error: { message: String(err), stderr: '' } };
+    }
+  });
+
+  ipcMain.handle('fs:newDir', async (_e, parent: string, name: string) => {
+    try {
+      const target = join(needRepo(), parent ? `${parent}/${name}` : name);
+      await fs.mkdir(target, { recursive: true });
+      return { ok: true, data: target };
+    } catch (err) {
+      return { ok: false, error: { message: String(err), stderr: '' } };
+    }
+  });
+
   ipcMain.on('shell:openExternal', (_e, url: string) => {
     if (typeof url === 'string' && /^https?:\/\//.test(url)) shell.openExternal(url);
   });

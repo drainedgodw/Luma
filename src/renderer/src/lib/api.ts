@@ -13,6 +13,8 @@ interface LumaApi {
   fsRead(p: string): Promise<GitResult<string>>;
   fsWrite(p: string, c: string): Promise<GitResult<null>>;
   fsList(p: string): Promise<GitResult<{ name: string; dir: boolean }[]>>;
+  fsNewFile(parent: string, name: string): Promise<GitResult<string>>;
+  fsNewDir(parent: string, name: string): Promise<GitResult<string>>;
   onCommand(cb: (e: { id: number; command: string; at: number }) => void): void;
   winMin(): void;
   winMax(): void;
