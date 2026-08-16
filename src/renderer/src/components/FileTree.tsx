@@ -16,7 +16,7 @@ export default function FileTree() {
   const [file, setFile] = useState<string | null>(null);
 
   useEffect(() => {
-    api.fs.list('').then((r) => setTree((r.data ?? []).map(toNode(''))));
+    api.fsList('').then((r) => setTree((r.data ?? []).map(toNode(''))));
   }, [repo]);
 
   const toNode = (parent: string) => (e: { name: string; dir: boolean }): Node => ({
@@ -34,7 +34,7 @@ export default function FileTree() {
       // keep the dir row: filter removed it — re-add by mapping first
       return;
     }
-    const r = await api.fs.list(n.path);
+    const r = await api.fsList(n.path);
     const children = (r.data ?? []).map(toNode(n.path));
     setTree((prev) => {
       const idx = prev.findIndex((x) => x.path === n.path);

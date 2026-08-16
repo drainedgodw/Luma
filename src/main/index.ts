@@ -23,6 +23,15 @@ function createWindow() {
     },
   });
   win.on('ready-to-show', () => win?.show());
+  if (process.env.LUMA_SHOT) {
+    setTimeout(async () => {
+      const image = await win!.webContents.capturePage();
+      const { writeFile } = await import('node:fs/promises');
+      await writeFile(process.env.LUMA_SHOT!, image.toPNG());
+      console.log(`screenshot saved: ${process.env.LUMA_SHOT}`);
+      app.quit();
+    }, 4000);
+  }
   win.on('closed', () => (win = null));
   if (process.env.ELECTRON_RENDERER_URL) {
     win.loadURL(process.env.ELECTRON_RENDERER_URL);

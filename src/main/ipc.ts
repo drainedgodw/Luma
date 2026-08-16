@@ -42,7 +42,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
     try {
       return JSON.parse(
         require('node:fs').readFileSync(join(app.getPath('userData'), 'recent.json'), 'utf8'),
-      );
+      ) as string[];
     } catch {
       return [];
     }
