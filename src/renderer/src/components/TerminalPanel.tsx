@@ -4,14 +4,32 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { api } from '../lib/api';
 import { useStore } from '../store';
+import { useSettings } from '../settings';
 
 let counter = 0;
+
+const THEMES = {
+  cosmos: {
+    bg: 'rgba(8, 10, 18, 0.55)',
+    fg: '#e6e6f0',
+    cursor: '#c4b5fd',
+    selection: 'rgba(139,92,246,0.35)',
+  },
+  liquid: {
+    bg: 'rgba(10, 14, 24, 0.35)',
+    fg: '#f2f4fa',
+    cursor: '#a5f3fc',
+    selection: 'rgba(165,243,252,0.30)',
+  },
+} as const;
 
 export default function TerminalPanel({ onClose }: { onClose: () => void }) {
   const holder = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
   const { repo } = useStore();
+  const { settings } = useSettings();
   const [id] = useState(() => `term-${Date.now()}-${++counter}`);
+  const theme = THEMES[settings.theme === 'liquid' ? 'liquid' : 'cosmos'];
 
   useEffect(() => {
     if (!holder.current || !repo) return;
@@ -19,10 +37,10 @@ export default function TerminalPanel({ onClose }: { onClose: () => void }) {
       fontSize: 12.5,
       fontFamily: 'var(--font-mono), monospace',
       theme: {
-        background: 'rgba(8, 10, 18, 0.55)',
-        foreground: '#e6e6f0',
-        cursor: '#c4b5fd',
-        selectionBackground: 'rgba(139,92,246,0.35)',
+        background: theme.bg,
+        foreground: theme.fg,
+        cursor: theme.cursor,
+        selectionBackground: theme.selection,
         black: '#16161f',
         red: '#f56565',
         green: '#68d391',
@@ -64,7 +82,7 @@ export default function TerminalPanel({ onClose }: { onClose: () => void }) {
       term.dispose();
       termRef.current = null;
     };
-  }, [id, repo]);
+  }, [id, repo, theme]);
 
   return (
     <div className="glass flex h-full min-h-0 flex-col overflow-hidden">
@@ -74,7 +92,7 @@ export default function TerminalPanel({ onClose }: { onClose: () => void }) {
         <div className="flex-1" />
         <button className="text-[11px] text-white/40 hover:text-white" title="Close terminal" onClick={onClose}>✕</button>
       </div>
-      <div ref={holder} className="min-h-0 flex-1 px-2 py-1" style={{ background: 'rgba(8,10,18,0.45)' }} />
+      <div ref={holder} className="min-h-0 flex-1 px-2 py-1" style={{ background: theme.bg }} />
     </div>
   );
 }
