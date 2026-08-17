@@ -10,13 +10,13 @@ let counter = 0;
 
 const THEMES = {
   cosmos: {
-    bg: 'rgba(8, 10, 18, 0.55)',
+    bg: 'transparent',
     fg: '#e6e6f0',
     cursor: '#c4b5fd',
     selection: 'rgba(139,92,246,0.35)',
   },
   liquid: {
-    bg: 'rgba(10, 14, 24, 0.35)',
+    bg: 'transparent',
     fg: '#f2f4fa',
     cursor: '#a5f3fc',
     selection: 'rgba(165,243,252,0.30)',
@@ -85,14 +85,14 @@ export default function TerminalPanel({ onClose }: { onClose: () => void }) {
   }, [id, repo, theme]);
 
   return (
-    <div className="glass flex h-full min-h-0 flex-col overflow-hidden">
+    <div className="term-panel flex h-full min-h-0 flex-col overflow-hidden">
       <div className="flex items-center gap-2 border-b border-white/8 px-3 py-1.5">
         <span className="text-[11px] uppercase tracking-wider text-white/40">Terminal</span>
         <span className="font-mono text-[10px] text-white/25">{repo}</span>
         <div className="flex-1" />
         <button className="text-[11px] text-white/40 hover:text-white" title="Close terminal" onClick={onClose}>✕</button>
       </div>
-      <div ref={holder} className="min-h-0 flex-1 px-2 py-1" style={{ background: theme.bg }} />
+      <div ref={holder} className="min-h-0 flex-1 px-2 py-1" style={{ background: 'transparent' }} />
     </div>
   );
 }

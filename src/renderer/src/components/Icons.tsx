@@ -76,6 +76,19 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M9.5 12l1.8 1.8 3.2-3.6" />
     </svg>
   ),
+  filePlus: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 3H6a1.5 1.5 0 0 0-1.5 1.5v15A1.5 1.5 0 0 0 6 21h12a1.5 1.5 0 0 0 1.5-1.5V8.5z" />
+      <path d="M14 3v5.5h5.5" />
+      <path d="M12 12v6M9 15h6" />
+    </svg>
+  ),
+  folderPlus: (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 7a1.5 1.5 0 0 1 1.5-1.5h4l2 2h8A1.5 1.5 0 0 1 20 9v9a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3 18z" />
+      <path d="M12 11v6M9 14h6" />
+    </svg>
+  ),
   close: (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <path d="M5 5l14 14M19 5L5 19" />

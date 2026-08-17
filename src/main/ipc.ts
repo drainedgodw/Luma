@@ -2,7 +2,9 @@ import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron';
 import { promises as fs } from 'node:fs';
 import { join } from 'node:path';
 import * as engine from './git/engine';
+import { tryGit } from './git/exec';
 import { registerTerminal } from './terminal';
+import { snapshot as snapFile, listSnapshots, getSnapshot } from './fileHistory';
 
 export function registerIpc(getWindow: () => BrowserWindow | null) {
   const repo = (): string | null => {
@@ -112,7 +114,24 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   ipcMain.handle('fs:write', async (_e, p: string, content: string) => {
     try {
       await fs.writeFile(join(needRepo(), p), content);
+      await snapFile(needRepo(), p, content);
       return { ok: true, data: null };
+    } catch (err) {
+      return { ok: false, error: { message: String(err), stderr: '' } };
+    }
+  });
+
+  ipcMain.handle('history:list', async (_e, p: string) => {
+    try {
+      return { ok: true, data: await listSnapshots(needRepo(), p) };
+    } catch {
+      return { ok: true, data: [] };
+    }
+  });
+
+  ipcMain.handle('history:get', async (_e, p: string, ts: number) => {
+    try {
+      return { ok: true, data: await getSnapshot(needRepo(), p, ts) };
     } catch (err) {
       return { ok: false, error: { message: String(err), stderr: '' } };
     }
@@ -150,6 +169,52 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
       const target = join(needRepo(), parent ? `${parent}/${name}` : name);
       await fs.mkdir(target, { recursive: true });
       return { ok: true, data: target };
+    } catch (err) {
+      return { ok: false, error: { message: String(err), stderr: '' } };
+    }
+  });
+
+  ipcMain.handle('fs:rename', async (_e, path: string, newName: string) => {
+    const repo = needRepo();
+    const from = join(repo, path);
+    const parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '';
+    const to = join(repo, parent ? `${parent}/${newName}` : newName);
+    try {
+      const tracked = await tryGit(repo, ['ls-files', '--error-unmatch', path]);
+      if (tracked.code === 0) {
+        const mv = await tryGit(repo, ['mv', path, parent ? `${parent}/${newName}` : newName]);
+        if (mv.code !== 0) return { ok: false, error: { message: mv.stderr, stderr: mv.stderr } };
+      } else {
+        await fs.rename(from, to);
+      }
+      return { ok: true, data: null };
+    } catch (err) {
+      return { ok: false, error: { message: String(err), stderr: '' } };
+    }
+  });
+
+  ipcMain.handle('fs:delete', async (_e, path: string, isDir: boolean) => {
+    const repo = needRepo();
+    try {
+      const tracked = await tryGit(repo, ['ls-files', '--error-unmatch', path]);
+      if (tracked.code === 0) {
+        const rm = await tryGit(repo, isDir ? ['rm', '-r', '-q', path] : ['rm', '-q', path]);
+        if (rm.code !== 0) return { ok: false, error: { message: rm.stderr, stderr: rm.stderr } };
+      } else {
+        await fs.rm(join(repo, path), { recursive: true, force: true });
+      }
+      return { ok: true, data: null };
+    } catch (err) {
+      return { ok: false, error: { message: String(err), stderr: '' } };
+    }
+  });
+
+  ipcMain.handle('fs:duplicate', async (_e, path: string) => {
+    try {
+      const dot = path.lastIndexOf('.');
+      const copy = dot > 0 ? `${path.slice(0, dot)}-copy${path.slice(dot)}` : `${path}-copy`;
+      await fs.copyFile(join(needRepo(), path), join(needRepo(), copy));
+      return { ok: true, data: copy };
     } catch (err) {
       return { ok: false, error: { message: String(err), stderr: '' } };
     }
