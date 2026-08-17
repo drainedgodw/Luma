@@ -8,6 +8,8 @@ import EditorWorkspace from './views/EditorWorkspace';
 import SettingsView from './views/SettingsView';
 import StoreView from './views/StoreView';
 import RescueView from './views/RescueView';
+import RebaseView from './views/RebaseView';
+import BridgesView from './views/BridgesView';
 import FileTree from './components/FileTree';
 import { ExplorerWake } from './components/FileTree';
 import EditorTabs from './components/EditorTabs';
@@ -20,7 +22,7 @@ import { Icon } from './components/Icons';
 import logo from './assets/logo.png';
 import { api as lumaApi, gitCall } from './lib/api';
 
-type View = 'editor' | 'graph' | 'changes' | 'languages' | 'settings' | 'rescue';
+type View = 'editor' | 'graph' | 'changes' | 'bridges' | 'languages' | 'settings' | 'rescue';
 
 function Shell() {
   const { repo, status, openRepo, refresh, setToast } = useStore();
@@ -31,6 +33,7 @@ function Shell() {
   const [explorerAwake, setExplorerAwake] = useState(false);
   const [showPalette, setShowPalette] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
+  const [rebaseTarget, setRebaseTarget] = useState<string | null>(null);
   const pinned = settings.explorer === 'pinned';
 
   useEffect(() => {
@@ -71,6 +74,7 @@ function Shell() {
       cmd('view-editor', 'Go to Editor', 'View', () => setView('editor')),
       cmd('view-graph', 'Go to Commit History', 'View', () => setView('graph')),
       cmd('view-changes', 'Go to Changes', 'View', () => setView('changes')),
+      cmd('view-bridges', 'Go to Bridges (PR view)', 'View', () => setView('bridges')),
       cmd('view-languages', 'Go to Languages', 'View', () => setView('languages')),
       cmd('view-settings', 'Go to Settings', 'View', () => setView('settings')),
       cmd('view-rescue', 'Go to Rescue (reflog)', 'View', () => setView('rescue')),
@@ -142,6 +146,7 @@ function Shell() {
             <DockBtn active={view === 'editor'} onClick={() => setView('editor')} label="Editor" text="Editor" icon={<Icon name="code" />} />
             <DockBtn active={view === 'graph'} onClick={() => setView('graph')} label="Commit History" text="History" icon={<Icon name="graph" />} />
             <DockBtn active={view === 'changes'} onClick={() => setView('changes')} label="Changes" text="Changes" icon={<Icon name="changes" />} badge={dirtyCount > 0 ? String(dirtyCount > 99 ? '99+' : dirtyCount) : null} />
+            <DockBtn active={view === 'bridges'} onClick={() => setView('bridges')} label="Bridges — every branch is a PR into the base branch" text="Bridges" icon={<Icon name="bridge" />} />
             <DockBtn active={showTerminal} onClick={() => setShowTerminal((v) => !v)} label="Terminal (Ctrl+`)" text="Term" icon={<Icon name="terminal" />} />
             <DockBtn active={view === 'rescue'} onClick={() => setView('rescue')} label="Rescue — undo anything with reflog" text="Rescue" icon={<Icon name="shield" />} />
             <DockBtn active={view === 'languages'} onClick={() => setView('languages')} label="Language packs" text="Langs" icon={<Icon name="grid" />} />
@@ -158,7 +163,9 @@ function Shell() {
             {view === 'editor' && <EditorTabs />}
             <div className={`min-h-0 flex-1 ${showTerminal ? 'flex flex-col gap-2' : 'flex flex-col'}`}>
               <div className="min-h-0 flex-1">
-                {view === 'graph' ? <GraphView /> : view === 'changes' ? <ChangesView onOpenFile={openFile} /> : view === 'languages' ? <StoreView /> : view === 'settings' ? <SettingsView /> : view === 'rescue' ? <RescueView /> : <EditorWorkspace />}
+                {rebaseTarget ? (
+                  <RebaseView targetBranch={rebaseTarget} onClose={() => setRebaseTarget(null)} />
+                ) : view === 'graph' ? <GraphView onRebase={(b) => setRebaseTarget(b)} /> : view === 'changes' ? <ChangesView onOpenFile={openFile} /> : view === 'bridges' ? <BridgesView onRebase={(b) => setRebaseTarget(b)} /> : view === 'languages' ? <StoreView /> : view === 'settings' ? <SettingsView /> : view === 'rescue' ? <RescueView /> : <EditorWorkspace />}
               </div>
               {showTerminal && (
                 <div className="h-[38%] min-h-[160px]">

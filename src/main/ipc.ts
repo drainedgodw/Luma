@@ -103,6 +103,16 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   on('git:reflog', () => `git reflog`, () => engine.reflog(needRepo()));
   on('git:rewindHard', (r: string) => `git reset --hard ${r}`, (r) => engine.rewindHard(needRepo(), r));
   on('git:rewindSoft', (r: string) => `git reset --soft ${r}`, (r) => engine.rewindSoft(needRepo(), r));
+  on('git:cherryPick', (h: string) => `git cherry-pick ${h}`, (h) => engine.cherryPick(needRepo(), h));
+  on('git:revert', (h: string) => `git revert --no-edit ${h}`, (h) => engine.revertCommit(needRepo(), h));
+  on('git:createTag', (n: string, h?: string, m?: string) => `git tag ${m ? '-a ' + n + ' -m "..." ' : n} ${h ?? ''}`.trim(), (n, h, m) => engine.createTag(needRepo(), n, h as string | undefined, m as string | undefined));
+  on('git:deleteTag', (n: string) => `git tag -d ${n}`, (n) => engine.deleteTag(needRepo(), n));
+  on('git:commitRange', (f: string, t: string) => `git log ${f}..${t}`, (f, t) => engine.getCommitRange(needRepo(), f as string, t as string));
+  on('git:rebaseTodo', () => `git rebase --show-todo`, () => engine.getRebaseTodo(needRepo()));
+  on('git:interactiveRebase', (base: string, todos: engine.RebaseTodoItem[]) => `git rebase -i ${base}`, (base, todos) => engine.startInteractiveRebase(needRepo(), base as string, todos as engine.RebaseTodoItem[]));
+  on('git:mainBranch', () => `git symbolic-ref refs/remotes/origin/HEAD`, () => engine.getMainBranch(needRepo()));
+  on('git:bridges', (base: string) => `git rev-list --left-right --count ${base}...`, (base) => engine.listBranchBridges(needRepo(), base as string));
+  on('git:remoteUrl', () => `git remote get-url origin`, () => engine.getRemoteUrl(needRepo()));
 
   ipcMain.handle('fs:read', async (_e, p: string) => {
     try {
@@ -222,6 +232,13 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
 
   ipcMain.on('shell:openExternal', (_e, url: string) => {
     if (typeof url === 'string' && /^https?:\/\//.test(url)) shell.openExternal(url);
+  });
+  ipcMain.handle('shell:openExternal', async (_e, url: string) => {
+    if (typeof url === 'string' && /^https?:\/\//.test(url)) {
+      await shell.openExternal(url);
+      return { ok: true, data: null };
+    }
+    return { ok: false, error: { message: 'Invalid URL', stderr: '' } };
   });
 
   registerTerminal(getWindow, repo);

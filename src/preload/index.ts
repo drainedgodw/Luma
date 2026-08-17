@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld('luma', {
   winMax: () => ipcRenderer.send('win:max'),
   winClose: () => ipcRenderer.send('win:close'),
   wallpaper: () => ipcRenderer.invoke('wallpaper:get'),
+  openExternal: (url: string) => ipcRenderer.invoke('shell:openExternal', url),
   termCreate: (id: string) => ipcRenderer.send('term:create', id),
   termWrite: (id: string, data: string) => ipcRenderer.send('term:write', id, data),
   termResize: (id: string, cols: number, rows: number) => ipcRenderer.send('term:resize', id, cols, rows),

@@ -19,7 +19,7 @@ function cy(i: number) {
   return TOP_PAD + i * ROW + ROW / 2;
 }
 
-export default function GraphView() {
+export default function GraphView({ onRebase }: { onRebase?: (branch: string) => void }) {
   const { commits, refresh, status, setToast } = useStore();
   const [selected, setSelected] = useState<Commit | null>(null);
   const [diff, setDiff] = useState<DiffFile[] | null>(null);
@@ -90,26 +90,33 @@ export default function GraphView() {
               <BranchMenu branches={localBranches} current={status?.branch} onClose={() => setBranchMenu(false)} action={action} />
             )}
           </div>
-          <div className="relative">
-            <button className="btn text-xs" onClick={() => { setBranchMenu(false); setRebaseMenu((v) => !v); }}>Rebase…</button>
-            {rebaseMenu && (
-              <div className="glass anim-in absolute right-0 top-10 z-30 w-56 p-2">
-                <div className="px-2 pb-1 text-[11px] text-white/40">Rebase current branch onto</div>
-                {localBranches.filter((b) => b !== status?.branch).map((b) => (
-                  <button key={b} className="block w-full truncate rounded-lg px-2 py-1.5 text-left text-xs hover:bg-white/8"
-                    onClick={() => { setRebaseMenu(false); action(() => gitCall('rebase', b)); }}>
-                    {b}
-                  </button>
-                ))}
-                <div className="mt-1 border-t border-white/10 pt-1">
-                  <button className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-amber hover:bg-white/8"
-                    onClick={() => { setRebaseMenu(false); action(() => gitCall('rebaseAbort')); }}>Abort rebase</button>
-                  <button className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-teal hover:bg-white/8"
-                    onClick={() => { setRebaseMenu(false); action(() => gitCall('rebaseContinue')); }}>Continue</button>
-                </div>
+              <div className="relative">
+                <button className="btn text-xs" onClick={() => { setBranchMenu(false); setRebaseMenu((v) => !v); }}>Rebase…</button>
+                {rebaseMenu && (
+                  <div className="glass anim-in absolute right-0 top-10 z-30 w-56 p-2">
+                    <div className="px-2 pb-1 text-[11px] text-white/40">Rebase current branch onto</div>
+                    {localBranches.filter((b) => b !== status?.branch).map((b) => (
+                      <div key={b} className="group/row flex items-center rounded-lg px-2 py-1 hover:bg-white/8">
+                        <button className="flex-1 truncate text-left text-xs" onClick={() => { setRebaseMenu(false); action(() => gitCall('rebase', b)); }}>
+                          {b}
+                        </button>
+                        {onRebase && (
+                          <button className="hidden text-[9px] text-lilac group-hover/row:block" title="Interactive rebase — reorder, squash, drop commits"
+                            onClick={(e) => { e.stopPropagation(); setRebaseMenu(false); onRebase(b); }}>
+                            edit…
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    <div className="mt-1 border-t border-white/10 pt-1">
+                      <button className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-amber hover:bg-white/8"
+                        onClick={() => { setRebaseMenu(false); action(() => gitCall('rebaseAbort')); }}>Abort rebase</button>
+                      <button className="block w-full rounded-lg px-2 py-1.5 text-left text-xs text-teal hover:bg-white/8"
+                        onClick={() => { setRebaseMenu(false); action(() => gitCall('rebaseContinue')); }}>Continue</button>
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
           <button className="btn text-xs" onClick={() => action(() => gitCall('fetch', 'origin'))}>Fetch</button>
           <button className="btn text-xs" onClick={() => action(() => gitCall('pull'))}>Pull</button>
           <button className="btn btn-primary text-xs" onClick={() => action(() => gitCall('push', !status?.upstream))}>Push</button>
@@ -222,6 +229,12 @@ export default function GraphView() {
                     {c.parents.length > 1 && (
                       <span className="rounded-full border border-white/15 px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-white/40">merge</span>
                     )}
+                    {selected?.hash === c.hash && (
+                      <>
+                        <button className="rounded-full border border-white/15 px-2 py-0.5 text-[9px] uppercase tracking-wide text-white/50 hover:bg-white/10 hover:text-white/80" title="Cherry-pick this commit onto current branch" onClick={(e) => { e.stopPropagation(); action(() => gitCall('cherryPick', c.hash), `Cherry-picked ${c.shortHash}`); }}>⎗ pick</button>
+                        <button className="rounded-full border border-white/15 px-2 py-0.5 text-[9px] uppercase tracking-wide text-white/50 hover:bg-white/10 hover:text-white/80" title="Revert this commit" onClick={(e) => { e.stopPropagation(); action(() => gitCall('revert', c.hash), `Reverted ${c.shortHash}`); }}>↩ revert</button>
+                      </>
+                    )}
                     {c.refs
                       .filter((r) => r !== 'HEAD')
                       .map((r) => {
@@ -278,7 +291,7 @@ function BranchMenu({
   branches, current, onClose, action,
 }: {
   branches: string[]; current?: string; onClose: () => void;
-  action: (fn: () => Promise<unknown>) => Promise<void>;
+  action: (fn: () => Promise<unknown>, okMsg?: string) => Promise<void>;
 }) {
   const [name, setName] = useState('');
   return (
@@ -300,10 +313,17 @@ function BranchMenu({
               {b}
             </button>
             {b !== current && (
-              <button className="ml-2 hidden text-[10px] text-rose group-hover:block"
-                onClick={() => { onClose(); action(() => gitCall('deleteBranch', b, false)); }}>
-                delete
-              </button>
+              <div className="ml-2 flex shrink-0 items-center gap-2">
+                <button className="hidden text-[10px] text-lilac group-hover:block"
+                  title={`Merge ${b} into the current branch (--no-ff)`}
+                  onClick={() => { onClose(); action(() => gitCall('merge', b, true), `Merged ${b}`); }}>
+                  merge
+                </button>
+                <button className="hidden text-[10px] text-rose group-hover:block"
+                  onClick={() => { onClose(); action(() => gitCall('deleteBranch', b, false)); }}>
+                  delete
+                </button>
+              </div>
             )}
           </div>
         ))}

@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { chmod, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { Commit, ConflictFile, DiffFile, GitRef, GitStatus, WorktreeState } from '../../shared/types';
 import { runGit, tryGit } from './exec';
@@ -342,4 +342,188 @@ export async function rewindHard(repo: string, ref: string): Promise<void> {
 
 export async function rewindSoft(repo: string, ref: string): Promise<void> {
   await runGit(repo, ['reset', '--soft', ref]);
+}
+
+export async function cherryPick(repo: string, hash: string): Promise<void> {
+  await runGit(repo, ['cherry-pick', hash]);
+}
+
+export async function revertCommit(repo: string, hash: string): Promise<void> {
+  await runGit(repo, ['revert', '--no-edit', hash]);
+}
+
+export async function createTag(repo: string, name: string, hash?: string, message?: string): Promise<void> {
+  const args = ['tag'];
+  if (message) args.push('-a', name, '-m', message);
+  else args.push(name);
+  if (hash) args.push(hash);
+  await runGit(repo, args);
+}
+
+export async function deleteTag(repo: string, name: string): Promise<void> {
+  await runGit(repo, ['tag', '-d', name]);
+}
+
+export async function getCommitRange(repo: string, from: string, to: string): Promise<Commit[]> {
+  const out = await runGit(repo, [
+    'log',
+    '--topo-order',
+    `--pretty=format:${LOG_FORMAT}`,
+    `${from}..${to}`,
+  ]);
+  return parseLog(out);
+}
+
+export interface RebaseTodoItem {
+  hash: string;
+  command: 'pick' | 'squash' | 'drop' | 'edit' | 'reword';
+  message: string;
+  shortHash: string;
+}
+
+export async function getRebaseTodo(repo: string): Promise<RebaseTodoItem[] | null> {
+  const dir = await tryGit(repo, ['rev-parse', '--git-path', 'rebase-merge']);
+  if (dir.code !== 0) {
+    const dir2 = await tryGit(repo, ['rev-parse', '--git-path', 'rebase-apply']);
+    if (dir2.code !== 0) return null;
+  }
+  const todoPath = await tryGit(repo, ['rev-parse', '--git-path', 'rebase-merge/git-rebase-todo']);
+  let todoFile: string;
+  if (todoPath.code === 0) {
+    todoFile = join(repo, todoPath.stdout.trim());
+  } else {
+    const applyPath = await tryGit(repo, ['rev-parse', '--git-path', 'rebase-apply/git-rebase-todo']);
+    if (applyPath.code === 0) {
+      todoFile = join(repo, applyPath.stdout.trim());
+    } else return null;
+  }
+  try {
+    const content = await readFile(todoFile, 'utf8');
+    return content
+      .split('\n')
+      .filter((line) => /^(pick|squash|drop|edit|reword)\s/.test(line))
+      .map((line) => {
+        const m = line.match(/^(pick|squash|drop|edit|reword)\s+(\S+)\s+(.*)$/)!;
+        return { command: m[1] as RebaseTodoItem['command'], hash: m[2], shortHash: m[2].slice(0, 7), message: m[3] };
+      });
+  } catch {
+    return null;
+  }
+}
+
+function shellQuote(s: string): string {
+  return '"' + s.replace(/[$"\\`]/g, '\\$&') + '"';
+}
+
+export async function startInteractiveRebase(repo: string, base: string, todos: RebaseTodoItem[]): Promise<void> {
+  const gitDir = (await runGit(repo, ['rev-parse', '--absolute-git-dir'])).trim();
+  const lines: string[] = [];
+  for (const t of todos) {
+    if (t.command === 'drop') continue;
+    if (t.command === 'reword') {
+      // the sequence editor cannot set messages, so amend right after the pick
+      lines.push(`pick ${t.hash}`);
+      lines.push(`exec git commit --amend -m ${shellQuote(t.message || 'reworded')}`);
+    } else {
+      lines.push(`${t.command} ${t.hash}`);
+    }
+  }
+  if (lines.length === 0) throw new Error('Nothing to rebase — every commit is dropped');
+  const todoPath = join(gitDir, 'luma-rebase-todo');
+  await writeFile(todoPath, lines.join('\n') + '\n');
+  const editorPath = join(gitDir, 'luma-rebase-editor.sh');
+  await writeFile(editorPath, `#!/bin/sh\nexec cp '${todoPath.replace(/'/g, "'\\''")}' "$1"\n`);
+  await chmod(editorPath, 0o755);
+  await runGit(
+    repo,
+    ['rebase', '-i', base],
+    {
+      GIT_SEQUENCE_EDITOR: editorPath,
+      // squash combines messages in the prepared file; accept them as-is
+      GIT_EDITOR: 'true',
+    },
+  );
+}
+
+// ---- branch bridges (PR-style overview) ----
+
+export interface BranchBridge {
+  name: string;
+  /** commit id of merge base with the base branch */
+  mergeBase: string;
+  /** commits only in this branch */
+  ahead: number;
+  /** commits only in the base branch */
+  behind: number;
+  insertions: number;
+  deletions: number;
+  files: number;
+  /** branch tip fully contained in base */
+  merged: boolean;
+  remoteTracking?: string;
+}
+
+export async function getMainBranch(repo: string): Promise<string> {
+  const symbolic = await tryGit(repo, ['symbolic-ref', '-q', '--short', 'refs/remotes/origin/HEAD']);
+  if (symbolic.code === 0) return symbolic.stdout.trim().replace(/^origin\//, '');
+  for (const candidate of ['main', 'master', 'trunk', 'develop']) {
+    const r = await tryGit(repo, ['rev-parse', '-q', '--verify', `refs/heads/${candidate}`]);
+    if (r.code === 0) return candidate;
+  }
+  return 'main';
+}
+
+export async function listBranchBridges(repo: string, base: string): Promise<BranchBridge[]> {
+  const out = await runGit(repo, ['for-each-ref', '--format=%(refname:short)\u001f%(upstream:short)', 'refs/heads']);
+  const branches: { name: string; remoteTracking?: string }[] = [];
+  for (const rec of out.split('\n').filter(Boolean)) {
+    const [name, upstream] = rec.split('\u001f');
+    if (name === base) continue;
+    branches.push({ name, remoteTracking: upstream || undefined });
+  }
+  const bridges: BranchBridge[] = [];
+  for (const b of branches) {
+    const counts = await tryGit(repo, ['rev-list', '--left-right', '--count', `${base}...${b.name}`]);
+    const [behind = 0, ahead = 0] = counts.code === 0 ? counts.stdout.trim().split(/\s+/).map((n) => parseInt(n, 10) || 0) : [];
+    const mb = await tryGit(repo, ['merge-base', base, b.name]);
+    const merged = await tryGit(repo, ['merge-base', '--is-ancestor', b.name, base]);
+    let insertions = 0;
+    let deletions = 0;
+    let files = 0;
+    try {
+      const stat = await runGit(repo, ['diff', '--numstat', '--format=', `${base}...${b.name}`]);
+      for (const line of stat.split('\n').filter(Boolean)) {
+        const [a, d] = line.split('\t');
+        files++;
+        insertions += a === '-' ? 0 : parseInt(a, 10) || 0;
+        deletions += d === '-' ? 0 : parseInt(d, 10) || 0;
+      }
+    } catch {
+      /* unreadable diff */
+    }
+    bridges.push({
+      name: b.name,
+      mergeBase: mb.code === 0 ? mb.stdout.trim() : '',
+      ahead,
+      behind,
+      insertions,
+      deletions,
+      files,
+      merged: merged.code === 0,
+      remoteTracking: b.remoteTracking,
+    });
+  }
+  // most active bridges first: unmerged with commits ahead, then merged
+  return bridges.sort((a, b) => Number(b.merged) - Number(a.merged) || b.ahead - a.ahead || a.name.localeCompare(b.name));
+}
+
+export async function getRemoteUrl(repo: string): Promise<string | null> {
+  const r = await tryGit(repo, ['remote', 'get-url', 'origin']);
+  if (r.code !== 0) return null;
+  const raw = r.stdout.trim();
+  const ssh = raw.match(/^git@([^:]+):(.+?)(?:\.git)?$/);
+  if (ssh) return `https://${ssh[1]}/${ssh[2]}`;
+  const https = raw.match(/^https?:\/\/.+$/);
+  if (https) return raw.replace(/\.git$/, '');
+  return null;
 }
