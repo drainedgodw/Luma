@@ -8,9 +8,14 @@ contextBridge.exposeInMainWorld('luma', {
   gitInvoke: (channel: string, ...args: unknown[]) => ipcRenderer.invoke(`git:${channel}`, ...args),
   fsRead: (p: string) => ipcRenderer.invoke('fs:read', p),
   fsWrite: (p: string, content: string) => ipcRenderer.invoke('fs:write', p, content),
+  historyList: (p: string) => ipcRenderer.invoke('history:list', p),
+  historyGet: (p: string, ts: number) => ipcRenderer.invoke('history:get', p, ts),
   fsList: (p: string) => ipcRenderer.invoke('fs:list', p),
   fsNewFile: (parent: string, name: string) => ipcRenderer.invoke('fs:newFile', parent, name),
   fsNewDir: (parent: string, name: string) => ipcRenderer.invoke('fs:newDir', parent, name),
+  fsRename: (path: string, newName: string) => ipcRenderer.invoke('fs:rename', path, newName),
+  fsDelete: (path: string, isDir: boolean) => ipcRenderer.invoke('fs:delete', path, isDir),
+  fsDuplicate: (path: string) => ipcRenderer.invoke('fs:duplicate', path),
   onCommand: (cb: (entry: { id: number; command: string; at: number }) => void) => {
     ipcRenderer.on('git:command', (_e, entry) => cb(entry));
   },

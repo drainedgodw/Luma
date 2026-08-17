@@ -10,6 +10,7 @@ import { useSettings } from '../settings';
 import { inlineSuggestion } from '../editor/inlineSuggest';
 import { lumaHighlighting } from '../editor/highlight';
 import { langSupport, keywordsFor, fileBadge } from '../languages';
+import FileHistoryModal from './FileHistoryModal';
 
 export default function CodeEditor({ path }: { path: string }) {
   const holder = useRef<HTMLDivElement>(null);
@@ -19,6 +20,7 @@ export default function CodeEditor({ path }: { path: string }) {
   const { settings } = useSettings();
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const conf = useMemo(() => ({ language: new Compartment(), theme: new Compartment(), suggest: new Compartment() }), []);
 
@@ -134,6 +136,9 @@ export default function CodeEditor({ path }: { path: string }) {
         <button className={`btn px-3 py-1 text-[11px] ${dirty ? 'border-lilac/50 text-lilac' : 'opacity-40'}`} disabled={!dirty || saving} onClick={save}>
           Save {dirty ? '●' : ''}
         </button>
+        <button className="btn px-3 py-1 text-[11px]" title="View save history and restore" onClick={() => setShowHistory(true)}>
+          History
+        </button>
         <button
           className="btn px-3 py-1 text-[11px]"
           title="Stage this file"
@@ -151,6 +156,18 @@ export default function CodeEditor({ path }: { path: string }) {
         </button>
       </div>
       <div ref={holder} className="min-h-0 flex-1 overflow-hidden" />
+      {showHistory && (
+        <FileHistoryModal
+          path={path}
+          onRestore={(content) => {
+            if (viewRef.current) {
+              viewRef.current.dispatch({ changes: { from: 0, to: viewRef.current.state.doc.length, insert: content } });
+              setDirty(true);
+            }
+          }}
+          onClose={() => setShowHistory(false)}
+        />
+      )}
     </div>
   );
 }

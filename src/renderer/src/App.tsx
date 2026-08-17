@@ -136,17 +136,18 @@ function Shell() {
               active={pinned}
               onClick={() => update({ explorer: pinned ? 'auto' : 'pinned' })}
               label={pinned ? 'Hide sidebar (slides out on hover)' : 'Show sidebar permanently'}
+              text="Panel"
               icon={<Icon name="panel" />}
             />
-            <DockBtn active={view === 'editor'} onClick={() => setView('editor')} label="Editor" icon={<Icon name="code" />} />
-            <DockBtn active={view === 'graph'} onClick={() => setView('graph')} label="History" icon={<Icon name="graph" />} />
-            <DockBtn active={view === 'changes'} onClick={() => setView('changes')} label="Changes" icon={<Icon name="changes" />} badge={dirtyCount > 0 ? String(dirtyCount > 99 ? '99+' : dirtyCount) : null} />
-            <DockBtn active={showTerminal} onClick={() => setShowTerminal((v) => !v)} label="Terminal (Ctrl+`)" icon={<Icon name="terminal" />} />
-            <DockBtn active={view === 'rescue'} onClick={() => setView('rescue')} label="Rescue — undo anything" icon={<Icon name="shield" />} />
-            <DockBtn active={view === 'languages'} onClick={() => setView('languages')} label="Languages" icon={<Icon name="grid" />} />
+            <DockBtn active={view === 'editor'} onClick={() => setView('editor')} label="Editor" text="Editor" icon={<Icon name="code" />} />
+            <DockBtn active={view === 'graph'} onClick={() => setView('graph')} label="Commit History" text="History" icon={<Icon name="graph" />} />
+            <DockBtn active={view === 'changes'} onClick={() => setView('changes')} label="Changes" text="Changes" icon={<Icon name="changes" />} badge={dirtyCount > 0 ? String(dirtyCount > 99 ? '99+' : dirtyCount) : null} />
+            <DockBtn active={showTerminal} onClick={() => setShowTerminal((v) => !v)} label="Terminal (Ctrl+`)" text="Term" icon={<Icon name="terminal" />} />
+            <DockBtn active={view === 'rescue'} onClick={() => setView('rescue')} label="Rescue — undo anything with reflog" text="Rescue" icon={<Icon name="shield" />} />
+            <DockBtn active={view === 'languages'} onClick={() => setView('languages')} label="Language packs" text="Langs" icon={<Icon name="grid" />} />
             <div className="mt-auto flex flex-col gap-1.5">
-              <DockBtn active={view === 'settings'} onClick={() => setView('settings')} label="Settings" icon={<Icon name="gear" />} />
-              <DockBtn active={false} onClick={() => openRepo()} label="Open repository" icon={<Icon name="folder" />} />
+              <DockBtn active={view === 'settings'} onClick={() => setView('settings')} label="Settings" text="Setup" icon={<Icon name="gear" />} />
+              <DockBtn active={false} onClick={() => openRepo()} label="Open repository" text="Open" icon={<Icon name="folder" />} />
             </div>
           </nav>
 
@@ -191,18 +192,19 @@ function WinBtn({ title, onClick, children, danger }: { title: string; onClick: 
   );
 }
 
-function DockBtn({ active, onClick, label, icon, badge }: { active: boolean; onClick: () => void; label: string; icon: React.ReactNode; badge?: string | null }) {
+function DockBtn({ active, onClick, label, icon, text, badge }: { active: boolean; onClick: () => void; label: string; icon: React.ReactNode; text?: string; badge?: string | null }) {
   return (
     <button
       title={label}
       onClick={onClick}
-      className={`relative flex h-11 w-11 items-center justify-center rounded-xl border transition-all duration-200 ${
+      className={`relative flex h-[52px] w-11 flex-col items-center justify-center gap-0.5 rounded-xl border transition-all duration-200 ${
         active
           ? 'border-lilac/50 bg-lilac/15 text-lilac shadow-[0_0_16px_rgba(196,181,253,0.25)]'
           : 'border-transparent text-white/45 hover:border-white/10 hover:bg-white/5 hover:text-white/80'
       }`}
     >
       {icon}
+      {text && <span className="text-[8px] tracking-wide opacity-70">{text}</span>}
       {badge && (
         <span className="absolute -right-1 -top-1 rounded-full bg-teal px-1.5 text-[10px] font-bold text-void">{badge}</span>
       )}
