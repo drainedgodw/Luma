@@ -80,7 +80,7 @@ export function registerIpc(getWindow: () => BrowserWindow | null) {
   on('git:branch', (n: string, f?: string) => `git branch ${n}${f ? ' ' + f : ''}`, (n, f) => engine.createBranch(needRepo(), n, f));
   on('git:checkout', (r: string, c?: string) => `git checkout${c ? ' -b ' + c : ''} ${r}`, (r, c) => engine.checkout(needRepo(), r, c));
   on('git:deleteBranch', (n: string, f: boolean) => `git branch -d ${n}`, (n, f) => engine.deleteBranch(needRepo(), n, f));
-  on('git:merge', (r: string, noFf: boolean) => `git merge ${r}`, (r, noFf) => engine.merge(needRepo(), r, noFf));
+  on('git:merge', (r: string, noFf: boolean, ffOnly: boolean) => `git merge${noFf ? ' --no-ff' : ''}${ffOnly ? ' --ff-only' : ''} ${r}`, (r, noFf, ffOnly) => engine.merge(needRepo(), r, noFf, ffOnly));
   on('git:mergeAbort', () => `git merge --abort`, () => engine.abortMerge(needRepo()));
   on('git:rebase', (o: string) => `git rebase ${o}`, (o) => engine.rebase(needRepo(), o));
   on('git:rebaseContinue', () => `git rebase --continue`, () => engine.continueRebase(needRepo()));

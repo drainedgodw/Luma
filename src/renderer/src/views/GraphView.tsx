@@ -294,6 +294,7 @@ function BranchMenu({
   action: (fn: () => Promise<unknown>, okMsg?: string) => Promise<void>;
 }) {
   const [name, setName] = useState('');
+  const [mergeFor, setMergeFor] = useState<string | null>(null);
   return (
     <div className="glass anim-in absolute right-0 top-10 z-30 w-64 p-2">
       <input className="field mb-2 w-full text-xs" placeholder="New branch name…" value={name}
@@ -307,21 +308,42 @@ function BranchMenu({
       </button>
       <div className="border-t border-white/10 pt-1">
         {branches.map((b) => (
-          <div key={b} className="group flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-white/8">
-            <button className={`flex-1 truncate text-left text-xs ${b === current ? 'text-teal' : ''}`}
-              onClick={() => { onClose(); if (b !== current) action(() => gitCall('checkout', b)); }}>
-              {b}
-            </button>
-            {b !== current && (
-              <div className="ml-2 flex shrink-0 items-center gap-2">
-                <button className="hidden text-[10px] text-lilac group-hover:block"
-                  title={`Merge ${b} into the current branch (--no-ff)`}
-                  onClick={() => { onClose(); action(() => gitCall('merge', b, true), `Merged ${b}`); }}>
-                  merge
+          <div key={b}>
+            <div className="group flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-white/8">
+              <button className={`flex-1 truncate text-left text-xs ${b === current ? 'text-teal' : ''}`}
+                onClick={() => { onClose(); if (b !== current) action(() => gitCall('checkout', b)); }}>
+                {b}
+              </button>
+              {b !== current && (
+                <div className="ml-2 flex shrink-0 items-center gap-2">
+                  <button className={`hidden text-[10px] group-hover:block ${mergeFor === b ? 'text-lilac' : 'text-lilac/70'}`}
+                    title={`Merge ${b} into the current branch — choose strategy`}
+                    onClick={() => setMergeFor(mergeFor === b ? null : b)}>
+                    merge
+                  </button>
+                  <button className="hidden text-[10px] text-rose group-hover:block"
+                    onClick={() => { onClose(); action(() => gitCall('deleteBranch', b, false)); }}>
+                    delete
+                  </button>
+                </div>
+              )}
+            </div>
+            {mergeFor === b && (
+              <div className="mb-1 ml-3 flex flex-col gap-0.5 rounded-lg border border-white/10 bg-black/30 p-1">
+                <button className="rounded px-2 py-1 text-left text-[10px] text-white/70 hover:bg-white/8"
+                  title="Fast-forward when possible, otherwise create a merge commit"
+                  onClick={() => { onClose(); action(() => gitCall('merge', b, false, false), `Merged ${b}`); }}>
+                  default <span className="text-white/35">— ff if possible, else merge commit</span>
                 </button>
-                <button className="hidden text-[10px] text-rose group-hover:block"
-                  onClick={() => { onClose(); action(() => gitCall('deleteBranch', b, false)); }}>
-                  delete
+                <button className="rounded px-2 py-1 text-left text-[10px] text-white/70 hover:bg-white/8"
+                  title="Always create a merge commit, even when a fast-forward is possible"
+                  onClick={() => { onClose(); action(() => gitCall('merge', b, true, false), `Merged ${b} (--no-ff)`); }}>
+                  --no-ff <span className="text-white/35">— always create a merge commit</span>
+                </button>
+                <button className="rounded px-2 py-1 text-left text-[10px] text-white/70 hover:bg-white/8"
+                  title="Refuse to merge unless the current branch can be fast-forwarded"
+                  onClick={() => { onClose(); action(() => gitCall('merge', b, false, true), `Fast-forwarded ${b}`); }}>
+                  --ff-only <span className="text-white/35">— fast-forward only, never merge commit</span>
                 </button>
               </div>
             )}

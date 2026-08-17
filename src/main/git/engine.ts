@@ -151,9 +151,10 @@ export async function deleteBranch(repo: string, name: string, force = false): P
   await runGit(repo, ['branch', force ? '-D' : '-d', name]);
 }
 
-export async function merge(repo: string, ref: string, noFf = false): Promise<void> {
+export async function merge(repo: string, ref: string, noFf = false, ffOnly = false): Promise<void> {
   const args = ['merge', ref];
   if (noFf) args.push('--no-ff');
+  if (ffOnly) args.push('--ff-only');
   await runGit(repo, args);
 }
 
