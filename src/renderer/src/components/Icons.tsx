@@ -89,6 +89,13 @@ const paths: Record<string, React.ReactNode> = {
       <path d="M12 11v6M9 14h6" />
     </svg>
   ),
+  bridge: (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 16h20" />
+      <path d="M5 16V9M19 16V9" />
+      <path d="M2 9c3.5 0 4.5 3 10 3s6.5-3 10-3" />
+    </svg>
+  ),
   close: (
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <path d="M5 5l14 14M19 5L5 19" />

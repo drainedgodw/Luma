@@ -25,6 +25,7 @@ interface LumaApi {
   winMax(): void;
   winClose(): void;
   wallpaper(): Promise<string | null>;
+  openExternal(url: string): Promise<GitResult<null>>;
   termCreate(id: string): void;
   termWrite(id: string, data: string): void;
   termResize(id: string, cols: number, rows: number): void;
