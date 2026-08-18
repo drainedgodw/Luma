@@ -18,8 +18,13 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Package test AppImage
+        if: github.event_name == 'push'
+        run: npx electron-builder --linux AppImage --publish never
       - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push'
         with:
-          name: renderer-build
-          path: out/
-          retention-days: 3
+          name: luma-linux-${{ github.sha }}
+          path: dist/*.AppImage
+          if-no-files-found: error
+          retention-days: 7
