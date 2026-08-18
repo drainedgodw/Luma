@@ -14,10 +14,16 @@ jobs:
         with:
           node-version: 22
           cache: npm
+      - name: Install native build tools
+        if: github.event_name == 'push'
+        run: sudo apt-get update && sudo apt-get install -y build-essential python3
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      - name: Rebuild native modules for Electron
+        if: github.event_name == 'push'
+        run: npx electron-rebuild --force --which-module node-pty
       - name: Package test AppImage
         if: github.event_name == 'push'
         run: npx electron-builder --linux AppImage --publish never
