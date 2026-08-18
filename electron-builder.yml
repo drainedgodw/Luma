@@ -6,6 +6,7 @@ files:
   - out/**/*
   - package.json
 linux:
+  executableName: luma
   target:
     - AppImage
     - tar.gz
@@ -13,7 +14,6 @@ linux:
   icon: build/icon.png
   desktop:
     Name: Luma
-    Exec: luma --ozone-platform-hint=auto %U
 electronDownload:
   mirror: https://github.com/electron/electron/releases/download/
 npmRebuild: false
