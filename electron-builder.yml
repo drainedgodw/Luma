@@ -15,7 +15,7 @@ linux:
     Name: Luma
     Exec: luma --ozone-platform-hint=auto %U
 electronDownload:
-  mirror: https://github.com/electron/electron/releases/download
+  mirror: https://github.com/electron/electron/releases/download/
 npmRebuild: false
 asar: true
 asarUnpack:
