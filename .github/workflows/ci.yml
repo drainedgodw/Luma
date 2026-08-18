@@ -26,7 +26,7 @@ jobs:
         run: npx electron-rebuild --force --which-module node-pty
       - name: Package test AppImage
         if: github.event_name == 'push'
-        run: npx electron-builder --linux AppImage --publish never --config.npmRebuild=false
+        run: npx electron-builder --linux AppImage --publish never
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'push'
         with:
