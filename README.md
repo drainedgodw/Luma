@@ -4,74 +4,95 @@
 
 # Luma
 
-**See your Git. No commands required.**
+**A visual, Git-first IDE for Linux.**
 
-Luma is an open-source, Git-first IDE for Linux (Arch first, everyone else next). It renders your entire repository history as a living graph, turns staging into drag & drop, and teaches Git by showing the command behind every click — instead of asking you to memorize one.
+Luma turns repository history and everyday Git operations into an interactive workspace. Inspect branches, stage changes, resolve conflicts, rewrite history, and recover previous states without leaving the editor.
 
-![status](https://img.shields.io/badge/platform-Linux%20·%20Arch-informational) ![license](https://img.shields.io/badge/license-MIT-success)
+![platform](https://img.shields.io/badge/platform-Linux%20·%20Arch-1793d1) ![license](https://img.shields.io/badge/license-MIT-22c55e) ![status](https://img.shields.io/badge/status-early%20development-f59e0b)
 
 </div>
 
-## Highlights
+## Current features
 
-- **Obsidian-style commit graph** — root commit, glowing branch lanes, merge curves. Click any commit for its full diff.
-- **Drag-and-drop staging** — pull files between *Working tree* and the *Commit container*; type a message; commit. Unstage by dragging back out.
-- **Visual diff** — green adds, red removes, per-hunk navigation.
-- **Visual conflict resolution** — side-by-side ours/theirs with *Keep ours / Take theirs / Keep both* per region.
-- **Detective mode** — a guided `git bisect`: Luma checks out suspects, you answer *Works* / *Broken*, it halves the search.
-- **Rebase, visualized** — start a rebase onto any branch, continue or abort, all from the graph toolbar.
-- **Honest by design** — a Commands panel shows every `git …` invocation Luma runs on your behalf.
-- **Command palette** (`Ctrl+Shift+P`) — every action of the IDE, from the keyboard.
-- **Built-in terminal** (`Ctrl+\``) — a real shell, in the repo directory, one keystroke away.
-- **Stash drawer** — stashes as cards with +/− stats; apply, pop or drop in one click.
-- **Rescue panel** — the full reflog as a timeline: jump back to any moment, soft or hard, with confirmation.
-- **Light shell** — Electron with a single-digit-MB renderer, Tailwind 4, CodeMirror 6 editor, glassmorphism kept GPU-cheap.
+- **Visual commit graph** — inspect branch lanes, merge paths, commit metadata, and diffs.
+- **Visual staging** — drag files between the working tree and commit container, then commit or amend.
+- **Diff and conflict tools** — review additions and deletions, navigate hunks, and resolve ours/theirs conflicts visually.
+- **Interactive rebase** — reorder, squash, fixup, reword, edit, or drop commits; continue or abort an interrupted rebase.
+- **Branch operations** — create, checkout, delete, merge with default/`--no-ff`/`--ff-only` strategies, rebase, cherry-pick, revert, and manage tags.
+- **Detective mode** — guided `git bisect` with clear Works/Broken decisions.
+- **Recovery tools** — stash management, reflog timeline, and soft/hard rewind actions with confirmation.
+- **Integrated workspace** — file explorer, CodeMirror 6 editor, tabs, command palette, terminal, file history, and theme settings.
+- **Transparent Git execution** — the Commands panel shows the equivalent `git` command for each action.
+
+> Luma is under active development. Use it on repositories with a clean working tree and a remote backup while testing destructive Git operations.
 
 ## Install
 
-### Arch Linux (AUR)
+### Development build from `main`
 
 ```sh
-yay -S luma-bin   # prebuilt release
-# or
-yay -S luma-git   # builds from main
+git clone https://github.com/drainedgodw/Luma.git
+cd Luma
+npm ci
+npm run dev
 ```
 
-### Any Linux
-
-Grab the `.AppImage` from [releases](https://github.com/drainedgodw/Luma/releases) and run it:
-
-```sh
-./luma-<version>.AppImage --ozone-platform-hint=auto
-```
-
-### From source
+### Production build
 
 ```sh
 npm ci
-npm run dev     # develop
-npm test        # run the test suite against real git repos
-npm run dist    # build AppImage + tar.gz
+npm run typecheck
+npm test
+npm run dist
 ```
 
-## Architecture
+Generated Linux packages are written to `dist/`.
 
+### Arch Linux
+
+The repository contains packaging definitions for:
+
+- `luma-git` — builds the latest `main` branch.
+- `luma-bin` — installs a prebuilt tagged release.
+
+Until the packages are published in AUR, install a GitHub Actions artifact or build from source. Tagged releases trigger the AppImage and AUR publishing workflow when the required repository secrets are configured.
+
+### AppImage
+
+Download an AppImage from [GitHub Releases](https://github.com/drainedgodw/Luma/releases), make it executable, and run it:
+
+```sh
+chmod +x luma-*.AppImage
+./luma-*.AppImage --ozone-platform-hint=auto
 ```
+
+## Project structure
+
+```text
 src/
-  main/       Electron main process — Git engine (CLI wrapper, real git, no lock-in)
-  preload/    context-bridge IPC
-  renderer/   React 19 + Tailwind 4 UI (graph view, changes view, editor)
-  shared/     types + graph layout algorithm (shared with tests)
+  main/       Electron process, Git engine, terminal and filesystem services
+  preload/    typed IPC bridge
+  renderer/   React interface, editor and visual Git workflows
+  shared/     shared types and commit graph layout
+
+tests/        parser, graph and real-repository integration tests
+.github/      CI, release and Arch packaging automation
 ```
 
-The Git engine shells out to the **system git** — every feature, full parity, zero vendored copies. Parsing is unit-tested against real repositories created on the fly.
+Luma uses the system Git executable as its source of truth, preserving compatibility with existing repositories, hooks, credentials, and new Git features.
 
-## Development
+## Quality gates
 
-- `npm run typecheck` — strict TypeScript, zero errors required
-- `npm test` — vitest suite (parsers, graph layout, bisect/merge/commit round-trips)
-- CI runs on every push: typecheck → tests → build → artifact
+Every push and pull request runs:
+
+```sh
+npm run typecheck
+npm test
+npm run build
+```
+
+Release tags additionally build Linux packages, checksums, and a GitHub Release.
 
 ## License
 
-MIT
+[MIT](LICENSE)
