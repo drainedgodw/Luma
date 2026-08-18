@@ -5,10 +5,6 @@ on:
     branches: [main]
   pull_request:
 
-permissions:
-  contents: read
-  issues: write
-
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -29,26 +25,12 @@ jobs:
         if: github.event_name == 'push'
         run: npx electron-rebuild --force --which-module node-pty
       - name: Package test AppImage
-        id: package
         if: github.event_name == 'push'
-        continue-on-error: true
-        run: |
-          set -o pipefail
-          npx electron-builder --linux AppImage --publish never 2>&1 | tee packaging.log
+        run: npx electron-builder --linux AppImage --publish never
       - uses: actions/upload-artifact@v4
-        if: github.event_name == 'push' && steps.package.outcome == 'success'
+        if: github.event_name == 'push'
         with:
           name: luma-linux-${{ github.sha }}
           path: dist/*.AppImage
           if-no-files-found: error
           retention-days: 7
-      - name: Report packaging failure
-        if: github.event_name == 'push' && steps.package.outcome == 'failure'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          printf 'Automated diagnostic for commit `%s`.\n\n```text\n' "$GITHUB_SHA" > issue.md
-          tail -n 100 packaging.log >> issue.md
-          printf '\n```\n' >> issue.md
-          gh issue create --title "CI diagnostic: AppImage packaging failure" --body-file issue.md
-          exit 1
