@@ -25,12 +25,32 @@ jobs:
         if: github.event_name == 'push'
         run: npx electron-rebuild --force --which-module node-pty
       - name: Package test AppImage
+        id: package
         if: github.event_name == 'push'
-        run: npx electron-builder --linux AppImage --publish never
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          npx electron-builder --linux AppImage --publish never 2>&1 | tee packaging.log
+      - name: Add packaging diagnostics to summary
+        if: github.event_name == 'push' && steps.package.outcome == 'failure'
+        run: |
+          echo '## AppImage packaging failure' >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          tail -n 80 packaging.log >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && steps.package.outcome == 'success'
         with:
           name: luma-linux-${{ github.sha }}
           path: dist/*.AppImage
           if-no-files-found: error
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        if: github.event_name == 'push' && steps.package.outcome == 'failure'
+        with:
+          name: luma-packaging-log-${{ github.sha }}
+          path: packaging.log
+          retention-days: 3
+      - name: Fail when packaging failed
+        if: github.event_name == 'push' && steps.package.outcome == 'failure'
+        run: exit 1
