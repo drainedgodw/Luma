@@ -3,5 +3,6 @@ out/
 dist/
 .cache/
 research/
+.obsidian/
 *.log
 .DS_Store
