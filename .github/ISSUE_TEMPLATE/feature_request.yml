@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose a focused product improvement
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Describe the workflow problem, not only the desired button.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed interaction
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Product area
+      options: [History and Orbit, Changes and commits, Recovery, Editor and language tools, Tasks and tests, GitHub, Terminal, Packaging, Accessibility]
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety and recovery implications
+      description: Explain whether the feature executes code or modifies files/history.
