@@ -2,12 +2,20 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, release-hardening]
   pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -15,17 +23,14 @@ jobs:
           node-version: 22
           cache: npm
       - name: Install native build tools
-        if: github.event_name == 'push'
         run: sudo apt-get update && sudo apt-get install -y build-essential python3
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
       - name: Rebuild native modules for Electron
-        if: github.event_name == 'push'
         run: npx electron-rebuild --force --which-module node-pty
-      - name: Package test AppImage
-        if: github.event_name == 'push'
+      - name: Package AppImage smoke build
         run: npx electron-builder --linux AppImage --publish never
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'push'
