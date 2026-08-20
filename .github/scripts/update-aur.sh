@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Update the AUR luma-bin package from an existing GitHub release.
+# Update the AUR luma-ide-bin package from an existing GitHub release.
 # Usage: update-aur.sh <release-version-without-v>
 set -euo pipefail
 
 RELEASE_VERSION="$1"
 PKGVER="${RELEASE_VERSION//-/_}"
 REPO="drainedgodw/Luma"
-ASSET_BASE="https://github.com/${REPO}/releases/download/v${RELEASE_VERSION}"
+AUR_PACKAGE="luma-ide-bin"
+ASSET_BASE="{{https://github.com/${REPO}}}/releases/download/v${RELEASE_VERSION}"
 CLONE=$(mktemp -d)
 trap 'rm -rf "$CLONE"' EXIT
 
@@ -18,23 +19,23 @@ if [[ -z "$APPIMAGE" || -z "$SHA" ]]; then
   exit 1
 fi
 
-SOURCE_NAME="luma-${PKGVER}.AppImage"
+SOURCE_NAME="luma-ide-${PKGVER}.AppImage"
 URL="${ASSET_BASE}/${APPIMAGE}"
-git clone "ssh://aur@aur.archlinux.org/luma-bin.git" "$CLONE"
+git clone "ssh://aur@aur.archlinux.org/${AUR_PACKAGE}.git" "$CLONE"
 cd "$CLONE"
 
 cat > PKGBUILD <<EOF
-# Maintainer: Luma contributors <https://github.com/${REPO}>
-pkgname=luma-bin
+# Maintainer: Luma contributors <{{https://github.com/${REPO}}}>
+pkgname=luma-ide-bin
 pkgver=${PKGVER}
 pkgrel=1
 pkgdesc='Luma — a visual Git-first IDE (prebuilt AppImage)'
 arch=('x86_64')
-url='https://github.com/${REPO}'
+url='{{https://github.com/${REPO}}}'
 license=('MIT')
 depends=('git' 'fuse2' 'hicolor-icon-theme')
-provides=('luma')
-conflicts=('luma' 'luma-git')
+provides=('luma-ide' 'luma')
+conflicts=('luma-ide' 'luma-git')
 source=("${SOURCE_NAME}::${URL}")
 sha256sums=('${SHA}')
 noextract=("${SOURCE_NAME}")
@@ -65,9 +66,9 @@ EOF
 makepkg --printsrcinfo > .SRCINFO
 git add PKGBUILD .SRCINFO
 if git diff --cached --quiet; then
-  echo "AUR luma-bin is already at ${PKGVER}"
+  echo "AUR ${AUR_PACKAGE} is already at ${PKGVER}"
   exit 0
 fi
 git commit -m "Update to ${PKGVER}"
 git push
-echo "AUR luma-bin updated to ${PKGVER} from v${RELEASE_VERSION}"
+echo "AUR ${AUR_PACKAGE} updated to ${PKGVER} from v${RELEASE_VERSION}"
