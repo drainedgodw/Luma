@@ -71,14 +71,20 @@ If Electron sandboxing is unavailable on the system, use `--no-sandbox` only as 
 
 ### Development build
 
+Use Node 22 (the `.nvmrc` file is included), then:
+
 ```sh
 git clone https://github.com/drainedgodw/Luma.git
 cd Luma
+nvm use
 npm ci
+npm run doctor
 npm run typecheck
 npm test
 npm run dev
 ```
+
+Luma commits a version-pinned npm install-script allowlist for `electron`, `esbuild` and `node-pty`. npm 12 should therefore install the reviewed binaries automatically instead of silently skipping them. `npm ci` also runs a dependency doctor and stops with an actionable error if a required binary is missing. Do not manually download or edit files in `node_modules`.
 
 ### Production package
 
