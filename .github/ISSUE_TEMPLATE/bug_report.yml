@@ -1,0 +1,55 @@
+name: Bug report
+description: Report a reproducible Luma problem
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Remove tokens, private repository names and personal paths from logs. Security issues must follow SECURITY.md instead."
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit SHA
+      placeholder: v0.1.0-alpha.1 or f403722
+    validations:
+      required: true
+  - type: dropdown
+    id: package
+    attributes:
+      label: Installation
+      options: [AppImage, Extracted AppImage, Source build, Other]
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: Arch Linux, Wayland, Git 2.51, KDE Plasma
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      placeholder: "1. Open…\n2. Select…\n3. Observe…"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior and sanitized logs
+    validations:
+      required: true
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Safety confirmation
+      options:
+        - label: I removed credentials, private paths and private repository information.
+          required: true
