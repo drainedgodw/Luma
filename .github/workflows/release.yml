@@ -10,28 +10,34 @@ permissions:
 jobs:
   build-linux:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
+      - name: Install native build tools
+        run: sudo apt-get update && sudo apt-get install -y build-essential python3
       - run: npm ci
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-      - name: Package (AppImage + tar.gz)
+      - name: Rebuild native modules for Electron
+        run: npx electron-rebuild --force --which-module node-pty
+      - name: Package AppImage and tarball
         run: npx electron-builder --linux AppImage tar.gz --publish never
-        env:
-          # use system electron downloads
-          ELECTRON_BUILDER_CACHE: .cache/electron-builder
       - name: Compute checksums
         run: cd dist && sha256sum *.AppImage *.tar.gz > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: luma-linux
-          path: dist/
-      - name: Create GitHub Release
+          name: luma-linux-${{ github.ref_name }}
+          path: |
+            dist/*.AppImage
+            dist/*.tar.gz
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+      - name: Create GitHub prerelease
         uses: softprops/action-gh-release@v2
         with:
           files: |
@@ -39,12 +45,20 @@ jobs:
             dist/*.tar.gz
             dist/SHA256SUMS.txt
           generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
 
   publish-aur:
+    if: ${{ vars.AUR_ENABLED == 'true' }}
     needs: build-linux
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate AUR configuration
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          AUR_USER: ${{ secrets.AUR_USER }}
+          AUR_EMAIL: ${{ secrets.AUR_EMAIL }}
+        run: test -n "$AUR_SSH_PRIVATE_KEY" && test -n "$AUR_USER" && test -n "$AUR_EMAIL"
       - name: Update AUR luma-bin
         env:
           AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
@@ -52,7 +66,7 @@ jobs:
           AUR_EMAIL: ${{ secrets.AUR_EMAIL }}
         run: |
           eval "$(ssh-agent -s)"
-          echo "$AUR_SSH_PRIVATE_KEY" | ssh-add -
+          printf '%s' "$AUR_SSH_PRIVATE_KEY" | ssh-add -
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
           git config --global user.name "$AUR_USER"
