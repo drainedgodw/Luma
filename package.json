@@ -10,14 +10,27 @@
     "url": "https://github.com/drainedgodw/Luma.git"
   },
   "author": "Luma contributors",
+  "engines": {
+    "node": ">=22.20 <23",
+    "npm": ">=10"
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "esbuild@0.25.12": true,
+    "node-pty@1.1.0": true
+  },
   "scripts": {
+    "postinstall": "node scripts/verify-install.cjs",
+    "doctor": "node scripts/verify-install.cjs",
+    "predev": "node scripts/verify-install.cjs",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prestart": "node scripts/verify-install.cjs",
     "start": "electron-vite preview",
     "dist": "electron-vite build && electron-builder --linux",
-    "predist": "npm run typecheck && npm run test"
+    "predist": "node scripts/verify-install.cjs && npm run typecheck && npm run test"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.0",
