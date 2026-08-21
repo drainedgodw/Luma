@@ -5,6 +5,10 @@ import { registerGitHubIpc } from './githubIpc';
 import { registerIntelligenceIpc } from './intelligenceIpc';
 import { getWallpaper } from './wallpaper';
 
+// Use Chromium's compositor-driven path for native wheel and touchpad input.
+// This matters most for transparent Electron windows under Wayland.
+app.commandLine.appendSwitch('enable-smooth-scrolling');
+
 let win: BrowserWindow | null = null;
 
 function createWindow() {
