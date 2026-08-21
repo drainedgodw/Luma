@@ -15,10 +15,8 @@ function createWindow() {
     minHeight: 600,
     show: false,
     frame: false,
-    // The renderer already draws the wallpaper used by Liquid Glass. Keeping
-    // the native window opaque avoids Linux compositor readback on every frame.
-    transparent: false,
-    backgroundColor: '#07070e',
+    transparent: true,
+    backgroundColor: '#00000000',
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
