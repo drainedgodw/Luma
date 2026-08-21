@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { startTransition, useCallback, useEffect, useMemo, useState } from 'react';
 import { StoreProvider, useStore } from './store';
 import { SettingsProvider, useSettings } from './settings';
 import { WorkspaceProvider, useWorkspace } from './workspace';
@@ -36,16 +36,23 @@ function Shell() {
   const [rebaseTarget, setRebaseTarget] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const pinned = settings.explorer === 'pinned';
+  const navigate = useCallback((next: View) => {
+    startTransition(() => setView(next));
+  }, []);
 
   useEffect(() => {
-    const handler = (event: Event) => { openFile((event as CustomEvent<string>).detail); setView('editor'); };
+    const handler = (event: Event) => { openFile((event as CustomEvent<string>).detail); navigate('editor'); };
     window.addEventListener('luma:open-file', handler);
     return () => window.removeEventListener('luma:open-file', handler);
-  }, [openFile]);
+  }, [navigate, openFile]);
 
   useEffect(() => {
     if (repo && localStorage.getItem('luma.onboarding.complete') !== '1') setShowOnboarding(true);
   }, [repo]);
+
+  useEffect(() => {
+    if (pinned) setExplorerAwake(false);
+  }, [pinned]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -62,12 +69,12 @@ function Shell() {
     const command = (id: string, label: string, group: string, run: () => void | Promise<void>, hint?: string): Command => ({ id, label, group, run, hint });
     const git = (label: string, run: () => Promise<unknown>) => command(`git-${label}`, label, 'Git', async () => { await run(); await refresh(); });
     return [
-      command('view-editor', 'Go to Editor', 'View', () => setView('editor')),
-      command('view-graph', 'Go to History / Orbit', 'View', () => setView('graph')),
-      command('view-changes', 'Go to Changes', 'View', () => setView('changes')),
-      command('view-github', 'Go to GitHub repositories', 'View', () => setView('github')),
-      command('view-intelligence', 'Go to Intelligence Center', 'View', () => setView('intelligence')),
-      command('view-rescue', 'Go to Rescue', 'View', () => setView('rescue')),
+      command('view-editor', 'Go to Editor', 'View', () => navigate('editor')),
+      command('view-graph', 'Go to History / Orbit', 'View', () => navigate('graph')),
+      command('view-changes', 'Go to Changes', 'View', () => navigate('changes')),
+      command('view-github', 'Go to GitHub repositories', 'View', () => navigate('github')),
+      command('view-intelligence', 'Go to Intelligence Center', 'View', () => navigate('intelligence')),
+      command('view-rescue', 'Go to Rescue', 'View', () => navigate('rescue')),
       command('show-onboarding', 'Show getting started guide', 'Help', () => setShowOnboarding(true)),
       command('toggle-terminal', 'Toggle Terminal', 'View', () => setShowTerminal(value => !value), 'Ctrl+`'),
       command('toggle-sidebar', 'Toggle Sidebar', 'View', () => update({ explorer: pinned ? 'auto' : 'pinned' }), 'Ctrl+B'),
@@ -78,24 +85,25 @@ function Shell() {
       git('Stage all changes', () => gitCall('stageAll')),
       git('Stash current changes', () => gitCall('stashPush')),
     ];
-  }, [openRepo, pinned, refresh, status?.upstream, update]);
+  }, [navigate, openRepo, pinned, refresh, status?.upstream, update]);
 
   if (!repo) return <Welcome/>;
   const dirty = status?.entries.length ?? 0;
+  const viewKey = rebaseTarget ? `rebase:${rebaseTarget}` : view;
   return <div className="relative flex h-full w-full flex-col">
     <header className="glass mx-3 mt-3 flex h-12 items-center gap-3 px-4" style={{ WebkitAppRegion: 'drag' } as never}>
       <img src={logo} alt="Luma" className="h-7 w-7 rounded-lg"/><span className="text-[14px] font-bold tracking-[.25em] text-lilac">LUMA</span><span className="text-white/20">/</span><span className="truncate font-mono text-xs text-white/65">{repo.split('/').pop()}</span>
       {status?.branch && <span className="rounded-full border border-teal/40 bg-teal/10 px-2 text-[11px] text-teal">⎇ {status.branch}{status.ahead > 0 && ` ↑${status.ahead}`}{status.behind > 0 && ` ↓${status.behind}`}</span>}
-      <TrustBadge repo={repo} open={() => setView('intelligence')}/><div className="flex-1"/>
+      <TrustBadge repo={repo} open={() => navigate('intelligence')}/><div className="flex-1"/>
       <div style={{ WebkitAppRegion: 'no-drag' } as never} className="flex items-center gap-2"><button className="btn text-xs" onClick={() => setShowOnboarding(true)}>Help</button><button className="btn text-xs" onClick={() => setShowPalette(true)}>⌘ Commands</button><button className="btn text-xs" onClick={() => setShowLog(value => !value)}>Log</button><WindowButton title="Minimize" run={() => api.winMin()}>─</WindowButton><WindowButton title="Maximize" run={() => api.winMax()}>▢</WindowButton><WindowButton title="Close" run={() => api.winClose()}>✕</WindowButton></div>
     </header>
 
     <div className="flex min-h-0 flex-1 gap-3 p-3">
-      <nav aria-label="Primary workspace" className="glass flex w-16 flex-col items-center gap-1.5 py-3"><img src={logo} alt="" className="mb-1 h-8 w-8 rounded-xl"/><Dock active={pinned} run={() => update({ explorer: pinned ? 'auto' : 'pinned' })} label="Toggle explorer" text="Panel" icon={<Icon name="panel"/>}/><Dock active={view === 'editor'} run={() => setView('editor')} label="Code editor" text="Code" icon={<Icon name="code"/>}/><Dock active={view === 'graph'} run={() => setView('graph')} label="History and Orbit" text="History" icon={<Icon name="graph"/>}/><Dock active={view === 'changes'} run={() => setView('changes')} label="Working tree and staged changes" text="Changes" icon={<Icon name="changes"/>} badge={dirty ? String(dirty) : null}/><Dock active={view === 'github'} run={() => setView('github')} label="GitHub repositories" text="GitHub" icon={<b className="text-[10px]">GH</b>}/><Dock active={view === 'intelligence'} run={() => setView('intelligence')} label="Trust, tests and language tools" text="Trust" icon={<span>◈</span>}/><Dock active={showTerminal} run={() => setShowTerminal(value => !value)} label="Integrated terminal" text="Term" icon={<Icon name="terminal"/>}/><Dock active={view === 'rescue'} run={() => setView('rescue')} label="Reflog and recovery" text="Rescue" icon={<Icon name="shield"/>}/><Dock active={view === 'languages'} run={() => setView('languages')} label="Language packs" text="Langs" icon={<Icon name="grid"/>}/><div className="mt-auto"><Dock active={view === 'settings'} run={() => setView('settings')} label="Settings" text="Setup" icon={<Icon name="gear"/>}/></div></nav>
+      <nav aria-label="Primary workspace" className="glass flex w-16 flex-col items-center gap-1.5 py-3"><img src={logo} alt="" className="mb-1 h-8 w-8 rounded-xl"/><Dock active={pinned} run={() => update({ explorer: pinned ? 'auto' : 'pinned' })} label="Toggle explorer" text="Panel" icon={<Icon name="panel"/>}/><Dock active={view === 'editor'} run={() => navigate('editor')} label="Code editor" text="Code" icon={<Icon name="code"/>}/><Dock active={view === 'graph'} run={() => navigate('graph')} label="History and Orbit" text="History" icon={<Icon name="graph"/>}/><Dock active={view === 'changes'} run={() => navigate('changes')} label="Working tree and staged changes" text="Changes" icon={<Icon name="changes"/>} badge={dirty ? String(dirty) : null}/><Dock active={view === 'github'} run={() => navigate('github')} label="GitHub repositories" text="GitHub" icon={<b className="text-[10px]">GH</b>}/><Dock active={view === 'intelligence'} run={() => navigate('intelligence')} label="Trust, tests and language tools" text="Trust" icon={<span>◈</span>}/><Dock active={showTerminal} run={() => setShowTerminal(value => !value)} label="Integrated terminal" text="Term" icon={<Icon name="terminal"/>}/><Dock active={view === 'rescue'} run={() => navigate('rescue')} label="Reflog and recovery" text="Rescue" icon={<Icon name="shield"/>}/><Dock active={view === 'languages'} run={() => navigate('languages')} label="Language packs" text="Langs" icon={<Icon name="grid"/>}/><div className="mt-auto"><Dock active={view === 'settings'} run={() => navigate('settings')} label="Settings" text="Setup" icon={<Icon name="gear"/>}/></div></nav>
       <ExplorerWake onWake={() => setExplorerAwake(true)} enabled={!pinned}/><FileTree awake={explorerAwake} onCollapse={() => setExplorerAwake(false)}/>
-      <main className="flex min-w-0 flex-1 flex-col gap-2">{view === 'editor' && <EditorTabs/>}<div className={`min-h-0 flex-1 ${showTerminal ? 'flex flex-col gap-2' : 'flex flex-col'}`}><div className="min-h-0 flex-1">{rebaseTarget ? <RebaseView targetBranch={rebaseTarget} onClose={() => setRebaseTarget(null)}/> : view === 'graph' ? <GraphView onRebase={setRebaseTarget}/> : view === 'changes' ? <ChangesView onOpenFile={openFile}/> : view === 'github' ? <GitHubView/> : view === 'intelligence' ? <IntelligenceView/> : view === 'languages' ? <StoreView/> : view === 'settings' ? <SettingsView/> : view === 'rescue' ? <RescueView/> : <EditorWorkspace/>}</div>{showTerminal && <div className="h-[38%] min-h-[160px]"><TerminalPanel onClose={() => setShowTerminal(false)}/></div>}</div></main>
+      <main className="flex min-w-0 flex-1 flex-col gap-2">{view === 'editor' && <EditorTabs/>}<div className={`min-h-0 flex-1 ${showTerminal ? 'flex flex-col gap-2' : 'flex flex-col'}`}><div className="min-h-0 flex-1"><div key={viewKey} className="view-surface h-full min-h-0">{rebaseTarget ? <RebaseView targetBranch={rebaseTarget} onClose={() => setRebaseTarget(null)}/> : view === 'graph' ? <GraphView onRebase={setRebaseTarget}/> : view === 'changes' ? <ChangesView onOpenFile={openFile}/> : view === 'github' ? <GitHubView/> : view === 'intelligence' ? <IntelligenceView/> : view === 'languages' ? <StoreView/> : view === 'settings' ? <SettingsView/> : view === 'rescue' ? <RescueView/> : <EditorWorkspace/>}</div></div>{showTerminal && <div className="h-[38%] min-h-[160px]"><TerminalPanel onClose={() => setShowTerminal(false)}/></div>}</div></main>
     </div>
-    {showPalette && <CommandPalette commands={commands} onClose={() => setShowPalette(false)}/>} {showLog && <CommandLog onClose={() => setShowLog(false)}/>} {status?.state === 'bisect' && <BisectView active onClose={() => {}}/>}<Toast/>{showOnboarding && <Onboarding close={() => { localStorage.setItem('luma.onboarding.complete', '1'); setShowOnboarding(false); }} go={(next) => { setView(next); setShowOnboarding(false); }}/>} 
+    {showPalette && <CommandPalette commands={commands} onClose={() => setShowPalette(false)}/>} {showLog && <CommandLog onClose={() => setShowLog(false)}/>} {status?.state === 'bisect' && <BisectView active onClose={() => {}}/>}<Toast/>{showOnboarding && <Onboarding close={() => { localStorage.setItem('luma.onboarding.complete', '1'); setShowOnboarding(false); }} go={(next) => { navigate(next); setShowOnboarding(false); }}/>} 
   </div>;
 }
 
@@ -117,7 +125,7 @@ function Welcome() {
   const { openRepo } = useStore();
   const [recent, setRecent] = useState<string[]>([]);
   useEffect(() => { void api.recentRepos().then(setRecent); }, []);
-  return <div className="flex h-full flex-col items-center justify-center gap-6 p-8"><img src={logo} alt="Luma" className="h-24 w-24 rounded-3xl"/><div className="text-center"><h1 className="text-5xl font-bold tracking-[.3em] text-lilac">LUMA</h1><p className="mt-3 text-white/60">See what Git will do before it does it.</p><p className="mt-1 text-xs text-white/35">Visual history · previewable operations · recoverable mistakes</p></div><button className="btn btn-primary px-8 py-3" onClick={() => openRepo()}>Open a Git repository</button>{recent.length > 0 && <div className="glass w-full max-w-xl p-3"><div className="mb-2 px-2 text-[10px] uppercase tracking-wider text-white/35">Recent repositories</div>{recent.map(path => <button className="block w-full truncate rounded-lg px-3 py-2 text-left font-mono text-xs text-white/60 hover:bg-white/5" key={path} onClick={() => openRepo(path)}>{path}</button>)}</div>}<div className="text-[10px] text-amber">Developer Preview · keep a remote backup</div></div>;
+  return <div className="welcome-shell flex h-full items-center justify-center p-6"><section className="welcome-card flex flex-col items-center gap-6"><img src={logo} alt="Luma" className="welcome-logo h-24 w-24 rounded-3xl"/><div className="text-center"><h1 className="welcome-title text-5xl font-bold tracking-[.3em]">LUMA</h1><p className="welcome-copy mt-3">See what Git will do before it does it.</p><p className="welcome-copy-muted mt-1 text-xs">Visual history · previewable operations · recoverable mistakes</p></div><button className="btn btn-primary welcome-action px-8 py-3" onClick={() => openRepo()}>Open a Git repository</button>{recent.length > 0 && <div className="welcome-recents p-3"><div className="mb-2 px-2 text-[10px] uppercase tracking-wider text-black/45">Recent repositories</div>{recent.map(path => <button className="block w-full truncate rounded-lg px-3 py-2 text-left font-mono text-xs text-black/65 hover:bg-black/6" key={path} onClick={() => openRepo(path)}>{path}</button>)}</div>}<div className="text-[10px] text-[#934b08]">Developer Preview · keep a remote backup</div></section></div>;
 }
 
 export default function App() { return <StoreProvider><SettingsProvider><WorkspaceProvider><Wallpaper/><div className="cosmos"/><Shell/></WorkspaceProvider></SettingsProvider></StoreProvider>; }
