@@ -47,9 +47,10 @@ The first release focuses on three promises:
 
 - Linux x86_64 (Wayland or X11)
 - Git
-- Node.js 22 and npm when building from source
 - A POSIX shell for the integrated terminal
 - FUSE 2 for direct AppImage launch, or use extraction mode below
+
+The AppImage does **not** require Node.js or npm.
 
 ### AppImage
 
@@ -69,30 +70,59 @@ If FUSE is unavailable:
 
 If Electron sandboxing is unavailable on the system, use `--no-sandbox` only as a temporary troubleshooting measure and understand the reduced isolation.
 
-### Development build
+### Development build without managing Node
 
-Use Node 22 (the `.nvmrc` file is included), then:
+The supported source workflow downloads a private, compatible Node 22 toolchain into the ignored `.luma/` directory. It does not replace your system Node, edit shell configuration, or require nvm/fnm/Volta. Fish users run the same command as Bash users:
 
 ```sh
 git clone https://github.com/drainedgodw/Luma.git
 cd Luma
-nvm use
-npm ci
-npm run doctor
-npm run typecheck
-npm test
-npm run dev
+bash scripts/bootstrap.sh dev
 ```
 
-Luma commits a version-pinned npm install-script allowlist for `electron`, `esbuild` and `node-pty`. npm 12 should therefore install the reviewed binaries automatically instead of silently skipping them. `npm ci` also runs a dependency doctor and stops with an actionable error if a required binary is missing. Do not manually download or edit files in `node_modules`.
+On the first run, the bootstrap:
+
+1. detects Linux/macOS and CPU architecture;
+2. downloads the latest compatible Node 22 archive from nodejs.org;
+3. verifies it against the official SHA-256 manifest;
+4. installs `package-lock.json` with lifecycle scripts disabled;
+5. runs only the reviewed `electron`, `esbuild` and `node-pty` installers;
+6. rebuilds `node-pty` for Electron and checks the result before launch.
+
+It also ignores inherited `ELECTRON_SKIP_BINARY_DOWNLOAD` and npm `ignore-scripts` settings for this run, so a global npm/Fish configuration cannot silently leave Electron uninstalled. No file in `node_modules` should be downloaded or edited manually.
+
+Useful commands:
+
+```sh
+bash scripts/bootstrap.sh setup       # prepare only
+bash scripts/bootstrap.sh doctor      # check runtime dependencies
+bash scripts/bootstrap.sh typecheck
+bash scripts/bootstrap.sh test
+bash scripts/bootstrap.sh ci          # typecheck + tests + production build
+bash scripts/bootstrap.sh dist        # build Linux packages
+bash scripts/bootstrap.sh clean       # keep the private Node download
+bash scripts/bootstrap.sh purge       # remove all generated files and private Node
+```
+
+If Git, Python 3, make, or a C++ compiler is missing, the script prints the exact distro command and can install it after confirmation. For a non-interactive one-shot setup on pacman/apt/dnf/zypper/apk systems:
+
+```sh
+bash scripts/bootstrap.sh dev --install-system-deps
+```
+
+To repair a partial installation:
+
+```sh
+bash scripts/bootstrap.sh setup --force
+```
+
+Advanced contributors can deliberately use an existing compatible Node by setting `LUMA_USE_SYSTEM_NODE=1`; the script refuses an incompatible version instead of producing a late Electron error.
 
 ### Production package
 
 ```sh
-npm ci
-npm run typecheck
-npm test
-npm run dist
+bash scripts/bootstrap.sh ci
+bash scripts/bootstrap.sh dist
 ```
 
 Packages are written to `dist/`.
