@@ -1,22 +1,26 @@
 /*
- * Low-power rendering helpers that deliberately preserve the original
- * Liquid Glass transparency, blur, colour and motion values from theme.css.
- * There are no background loops, timers or visual overrides here.
+ * Interaction-only performance helpers. These rules preserve the original
+ * Liquid Glass blur, opacity, saturation and colours from theme.css.
+ * There are no idle timers, render loops or visual theme overrides here.
  */
+
+:root {
+  --motion-spring: cubic-bezier(.22, 1, .36, 1);
+  --motion-soft: cubic-bezier(.2, .8, .2, 1);
+}
 
 .term-panel {
   contain: layout paint style;
 }
 
-/* History can contain hundreds of cards. Let Chromium skip off-screen card
- * rasterisation while keeping the full scroll range and graph intact. */
+/* History can contain hundreds of cards. Chromium may skip rasterising cards
+ * that are outside the viewport while preserving the complete graph. */
 section.glass > header + .overflow-auto > .relative > button.absolute {
   content-visibility: auto;
   contain: layout paint style;
   contain-intrinsic-size: auto 56px;
 }
 
-/* The same optimisation helps long recovery/history lists. */
 .overflow-y-auto .glass-soft {
   content-visibility: auto;
   contain-intrinsic-size: auto 56px;
@@ -25,6 +29,185 @@ section.glass > header + .overflow-auto > .relative > button.absolute {
 .overflow-auto,
 .overflow-y-auto {
   overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+
+/* All common controls use explicit compositor-friendly properties, never all. */
+button {
+  transition-property: transform, opacity, color, background-color, border-color, box-shadow;
+  transition-duration: 180ms;
+  transition-timing-function: var(--motion-soft);
+}
+
+button:active {
+  transform: scale(.975);
+}
+
+.view-surface {
+  animation: view-surface-in 260ms var(--motion-spring) both;
+  transform-origin: 50% 50%;
+}
+
+@keyframes view-surface-in {
+  from { opacity: .72; transform: translate3d(0, 7px, 0) scale(.997); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+/* Pinned explorer participates in layout; auto explorer is an overlay and only
+ * animates transform/opacity, so opening it never reflows the workspace. */
+.explorer-pinned {
+  width: 240px;
+  min-width: 240px;
+  height: 100%;
+}
+
+.explorer-flyout {
+  position: fixed;
+  left: 88px;
+  top: 72px;
+  bottom: 12px;
+  z-index: 55;
+  width: 240px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease-out;
+}
+
+.explorer-flyout > .glass {
+  transform: translate3d(-18px, 0, 0) scale(.985);
+  transform-origin: left center;
+  transition: transform 360ms var(--motion-spring);
+}
+
+.explorer-flyout[data-awake='true'] {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.explorer-flyout[data-awake='true'] > .glass {
+  transform: translate3d(0, 0, 0) scale(1);
+}
+
+.explorer-wake-zone {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  z-index: 60;
+  width: 12px;
+  height: 96px;
+  transform: translateY(-50%);
+}
+
+.explorer-wake-handle {
+  position: absolute;
+  left: 0;
+  top: 18px;
+  width: 4px;
+  height: 60px;
+  border-radius: 0 999px 999px 0;
+  background: rgba(255, 255, 255, .44);
+  box-shadow: 0 0 18px rgba(196, 181, 253, .28);
+  opacity: .34;
+  transform: scaleY(.62);
+  transition: opacity 180ms ease, transform 300ms var(--motion-spring);
+}
+
+.explorer-wake-zone:hover .explorer-wake-handle {
+  opacity: .9;
+  transform: scaleY(1);
+}
+
+/* Welcome is a single frosted launcher-style block. It is intentionally light
+ * in both themes so the permanent black logo remains legible. */
+.welcome-shell {
+  position: relative;
+  isolation: isolate;
+}
+
+.welcome-card {
+  position: relative;
+  width: min(640px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  padding: 46px 44px 34px;
+  color: #08080b;
+  border: 1px solid rgba(255, 255, 255, .55);
+  border-radius: 34px;
+  background: linear-gradient(145deg, rgba(245, 245, 248, .62), rgba(224, 224, 232, .32));
+  backdrop-filter: blur(38px) saturate(1.35);
+  -webkit-backdrop-filter: blur(38px) saturate(1.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .82),
+    inset 0 -1px 0 rgba(255, 255, 255, .16),
+    0 28px 90px rgba(0, 0, 0, .28),
+    0 0 0 1px rgba(255, 255, 255, .12);
+  animation: welcome-card-in 420ms var(--motion-spring) both;
+}
+
+html[data-theme='liquid'] .welcome-card {
+  background: linear-gradient(145deg, rgba(245, 245, 248, .48), rgba(220, 224, 232, .22));
+}
+
+.welcome-card::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  pointer-events: none;
+  border: 1px solid rgba(255, 255, 255, .26);
+  border-radius: 31px;
+}
+
+@keyframes welcome-card-in {
+  from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.975); }
+  to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+}
+
+.welcome-logo {
+  filter: brightness(0) saturate(100%);
+}
+
+.welcome-title {
+  color: #060608;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .28);
+}
+
+.welcome-copy { color: rgba(8, 8, 11, .66); }
+.welcome-copy-muted { color: rgba(8, 8, 11, .46); }
+
+html[data-theme] .welcome-card .welcome-action {
+  color: #08080b;
+  border-color: rgba(8, 8, 11, .22);
+  background: rgba(255, 255, 255, .38);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .6), 0 8px 24px rgba(0, 0, 0, .10);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  filter: none;
+}
+
+html[data-theme] .welcome-card .welcome-action:hover {
+  color: #000;
+  border-color: rgba(8, 8, 11, .38);
+  background: rgba(255, 255, 255, .58);
+  transform: translateY(-1px) scale(1.012);
+  filter: none;
+}
+
+.welcome-recents {
+  width: 100%;
+  border: 1px solid rgba(8, 8, 11, .12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, .20);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .38);
+}
+
+.reduce-motion .view-surface,
+.reduce-motion .welcome-card {
+  animation: none !important;
+}
+
+.reduce-motion .explorer-flyout,
+.reduce-motion .explorer-wake-handle {
+  transition: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
