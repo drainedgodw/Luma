@@ -83,7 +83,8 @@ export function installSmoothScroll(): void {
     ) return;
 
     const origin = event.target instanceof Element ? event.target : null;
-    if (!origin || origin.closest('.xterm, .cm-editor, [data-native-scroll]')) return;
+    if (!origin || origin.closest('.xterm, [data-native-scroll]')) return;
+    const forceSmooth = Boolean(origin.closest('.cm-editor, [data-smooth-scroll="always"]'));
 
     const element = findScrollContainer(origin, event.deltaY);
     if (!element) return;
@@ -91,7 +92,7 @@ export function installSmoothScroll(): void {
     const pixelDelta = toPixels(event, element);
     // Precision touchpads already provide small, inertial pixel deltas. Keeping
     // those native avoids double smoothing and preserves direct manipulation.
-    if (event.deltaMode === 0 && Math.abs(pixelDelta) < 42) return;
+    if (!forceSmooth && event.deltaMode === 0 && Math.abs(pixelDelta) < 42) return;
 
     event.preventDefault();
     const limitedDelta = Math.sign(pixelDelta) * Math.min(Math.abs(pixelDelta), MAX_WHEEL_STEP);
