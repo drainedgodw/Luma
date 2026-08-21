@@ -21,9 +21,26 @@ section.glass > header + .overflow-auto > .relative > button.absolute {
   contain-intrinsic-size: auto 56px;
 }
 
-.overflow-y-auto .glass-soft {
+.overflow-y-auto .glass-soft:not(.rescue-row) {
   content-visibility: auto;
   contain-intrinsic-size: auto 56px;
+}
+
+/* Rescue has only a short reflog. Keeping every row ready and letting the
+ * already-blurred parent provide the glass avoids repainting 30 nested blurs
+ * while the list moves. */
+.rescue-row {
+  content-visibility: visible;
+  contain: layout paint style;
+  background: rgba(255, 255, 255, .035);
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html[data-theme='liquid'] .rescue-row {
+  background: rgba(10, 14, 24, .34);
+  border-color: rgba(255, 255, 255, .16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12);
 }
 
 .overflow-auto,
@@ -53,12 +70,17 @@ button:active {
   to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 
-/* Pinned explorer participates in layout; auto explorer is an overlay and only
- * animates transform/opacity, so opening it never reflows the workspace. */
+/* Panel only chooses the mode. Pinned Explorer participates in layout; auto
+ * Explorer rolls fully in and out over the workspace without reflowing it. */
 .explorer-pinned {
   width: 240px;
   min-width: 240px;
   height: 100%;
+}
+
+nav[aria-label='Primary workspace'] {
+  position: relative;
+  z-index: 56;
 }
 
 .explorer-flyout {
@@ -68,53 +90,47 @@ button:active {
   bottom: 12px;
   z-index: 55;
   width: 240px;
-  opacity: 0;
   pointer-events: none;
-  transition: opacity 180ms ease-out;
 }
 
 .explorer-flyout > .glass {
-  transform: translate3d(-18px, 0, 0) scale(.985);
+  transform: translate3d(-252px, 0, 0);
   transform-origin: left center;
-  transition: transform 360ms var(--motion-spring);
+  transition: transform 420ms var(--motion-spring);
 }
 
 .explorer-flyout[data-awake='true'] {
-  opacity: 1;
   pointer-events: auto;
 }
 
 .explorer-flyout[data-awake='true'] > .glass {
-  transform: translate3d(0, 0, 0) scale(1);
+  transform: translate3d(0, 0, 0);
 }
 
+/* The whole usable left edge is the wake line, not a small hotspot. */
 .explorer-wake-zone {
   position: fixed;
   left: 0;
-  top: 50%;
+  top: 72px;
+  bottom: 12px;
   z-index: 60;
   width: 12px;
-  height: 96px;
-  transform: translateY(-50%);
 }
 
 .explorer-wake-handle {
   position: absolute;
-  left: 0;
-  top: 18px;
-  width: 4px;
-  height: 60px;
+  inset: 0 auto 0 0;
+  width: 3px;
   border-radius: 0 999px 999px 0;
-  background: rgba(255, 255, 255, .44);
-  box-shadow: 0 0 18px rgba(196, 181, 253, .28);
-  opacity: .34;
-  transform: scaleY(.62);
-  transition: opacity 180ms ease, transform 300ms var(--motion-spring);
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, .42) 12%, rgba(196, 181, 253, .52) 50%, rgba(255, 255, 255, .42) 88%, transparent);
+  box-shadow: 0 0 16px rgba(196, 181, 253, .20);
+  opacity: .32;
+  transition: opacity 180ms ease, width 280ms var(--motion-spring);
 }
 
 .explorer-wake-zone:hover .explorer-wake-handle {
+  width: 5px;
   opacity: .9;
-  transform: scaleY(1);
 }
 
 /* Welcome is a single frosted launcher-style block. It is intentionally light
@@ -205,7 +221,7 @@ html[data-theme] .welcome-card .welcome-action:hover {
   animation: none !important;
 }
 
-.reduce-motion .explorer-flyout,
+.reduce-motion .explorer-flyout > .glass,
 .reduce-motion .explorer-wake-handle {
   transition: none !important;
 }
