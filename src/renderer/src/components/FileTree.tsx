@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../lib/api';
 import { useStore } from '../store';
 import { useWorkspace } from '../workspace';
@@ -26,8 +26,8 @@ interface Menu {
 }
 
 /**
- * Explorer shutter. Pinned: always in place. Auto: fully hidden, slides out
- * when the cursor touches the left edge and pushes the workspace aside.
+ * Explorer shutter. Pinned: always in place. Auto: a transform-only overlay
+ * that wakes from a small hotspot on the left edge without reflowing the app.
  */
 export default function FileTree({ awake, onCollapse }: { awake: boolean; onCollapse: () => void }) {
   const { repo } = useStore();
@@ -39,6 +39,7 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
   const [menu, setMenu] = useState<Menu | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
+  const collapseTimer = useRef<number | null>(null);
   const pinned = settings.explorer === 'pinned';
 
   const reload = useCallback(() => {
@@ -57,6 +58,19 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
       return copy.map((x) => (x.path === parent ? { ...x, open: true } : x));
     });
   }, [reload]);
+
+  const cancelCollapse = useCallback(() => {
+    if (collapseTimer.current !== null) window.clearTimeout(collapseTimer.current);
+    collapseTimer.current = null;
+  }, []);
+
+  const scheduleCollapse = useCallback(() => {
+    if (pinned) return;
+    cancelCollapse();
+    collapseTimer.current = window.setTimeout(onCollapse, 180);
+  }, [cancelCollapse, onCollapse, pinned]);
+
+  useEffect(() => () => cancelCollapse(), [cancelCollapse]);
 
   async function doRename(node: Node) {
     const name = renameDraft.trim().replace(/\//g, '-');
@@ -134,13 +148,12 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
     setCreating(null);
     if (!r.ok) return;
     if (creating.parent) {
-      // refresh the parent's children in place
       const rr = await api.fsList(creating.parent);
       const children = (rr.data ?? []).map(toNode(creating.parent));
       setTree((prev) => {
         const idx = prev.findIndex((x) => x.path === creating.parent);
         const copy = [...prev];
-        copy.splice(idx + 1, 1, ...children); // replace old children block
+        copy.splice(idx + 1, 1, ...children);
         return copy.map((x) => (x.path === creating.parent ? { ...x, open: true } : x));
       });
       if (creating.kind === 'file') openFile(creating.parent ? `${creating.parent}/${name}` : name);
@@ -175,18 +188,12 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
     </div>
   );
 
-  const shown = pinned || awake;
-
   return (
     <div
-      className="shrink-0"
-      style={{
-        width: shown ? 240 : 0,
-        overflow: 'hidden',
-        transition: 'width .28s cubic-bezier(.16,1,.3,1)',
-        pointerEvents: shown ? 'auto' : 'none',
-      }}
-      onMouseLeave={onCollapse}
+      className={pinned ? 'explorer-pinned shrink-0' : 'explorer-flyout'}
+      data-awake={pinned || awake ? 'true' : 'false'}
+      onMouseEnter={cancelCollapse}
+      onMouseLeave={scheduleCollapse}
     >
       <div className="glass flex h-full flex-col overflow-hidden" style={{ width: 240 }}>
         <div className="flex items-center gap-1 border-b border-white/8 px-3 py-2">
@@ -231,41 +238,41 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
                     />
                   ) : (
                     <>
-                  {n.dir ? (
-                    <span className="h-3.5 w-3.5 shrink-0 rounded-[4px] bg-white/10" />
-                  ) : (
-                    <span
-                      className="w-6 shrink-0 rounded text-center text-[8px] font-bold leading-4"
-                      style={{ color: badge.color, background: `${badge.color}1c` }}
-                    >
-                      {badge.label}
-                    </span>
-                  )}
-                  <span className="truncate">{n.name}</span>
-                  {n.dir && (
-                    <span className="ml-auto hidden shrink-0 items-center gap-1 pr-1 group-hover/row:flex">
-                      <span
-                        className="rounded p-0.5 text-white/40 hover:text-teal"
-                        title={`New file in ${n.name}/`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startCreating(n.path, 'file');
-                        }}
-                      >
-                        <Icon name="filePlus" />
-                      </span>
-                      <span
-                        className="rounded p-0.5 text-white/40 hover:text-teal"
-                        title={`New folder in ${n.name}/`}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          startCreating(n.path, 'dir');
-                        }}
-                      >
-                        <Icon name="folderPlus" />
-                      </span>
-                    </span>
-                  )}
+                      {n.dir ? (
+                        <span className="h-3.5 w-3.5 shrink-0 rounded-[4px] bg-white/10" />
+                      ) : (
+                        <span
+                          className="w-6 shrink-0 rounded text-center text-[8px] font-bold leading-4"
+                          style={{ color: badge.color, background: `${badge.color}1c` }}
+                        >
+                          {badge.label}
+                        </span>
+                      )}
+                      <span className="truncate">{n.name}</span>
+                      {n.dir && (
+                        <span className="ml-auto hidden shrink-0 items-center gap-1 pr-1 group-hover/row:flex">
+                          <span
+                            className="rounded p-0.5 text-white/40 hover:text-teal"
+                            title={`New file in ${n.name}/`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startCreating(n.path, 'file');
+                            }}
+                          >
+                            <Icon name="filePlus" />
+                          </span>
+                          <span
+                            className="rounded p-0.5 text-white/40 hover:text-teal"
+                            title={`New folder in ${n.name}/`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startCreating(n.path, 'dir');
+                            }}
+                          >
+                            <Icon name="folderPlus" />
+                          </span>
+                        </span>
+                      )}
                     </>
                   )}
                 </button>
@@ -315,8 +322,31 @@ function MenuItem({ label, hint, onClick, danger }: { label: string; hint?: stri
   );
 }
 
-/** Wide invisible strip on the window's left edge that wakes the explorer (auto mode only). */
+/** Small, deliberate hotspot on the left edge that wakes auto Explorer. */
 export function ExplorerWake({ onWake, enabled }: { onWake: () => void; enabled: boolean }) {
+  const wakeTimer = useRef<number | null>(null);
+  const cancelWake = useCallback(() => {
+    if (wakeTimer.current !== null) window.clearTimeout(wakeTimer.current);
+    wakeTimer.current = null;
+  }, []);
+
+  useEffect(() => () => cancelWake(), [cancelWake]);
   if (!enabled) return null;
-  return <div className="fixed left-0 top-0 z-50 h-full w-3" onMouseEnter={onWake} />;
+
+  return (
+    <div
+      className="explorer-wake-zone"
+      aria-hidden="true"
+      onPointerEnter={() => {
+        cancelWake();
+        wakeTimer.current = window.setTimeout(() => {
+          wakeTimer.current = null;
+          onWake();
+        }, 90);
+      }}
+      onPointerLeave={cancelWake}
+    >
+      <span className="explorer-wake-handle" />
+    </div>
+  );
 }
