@@ -10,6 +10,7 @@ interface ActiveScroll {
 
 const IOS_EASE_REMAINING = 0.78;
 const MAX_WHEEL_STEP = 180;
+const MAX_SCROLL_LEAD = 480;
 
 function canScroll(element: HTMLElement, deltaY: number): boolean {
   const style = window.getComputedStyle(element);
@@ -59,7 +60,14 @@ export function installSmoothScroll(): void {
     const elapsed = Math.min(34, Math.max(8, now - active.lastFrame));
     active.lastFrame = now;
     const distance = active.target - active.element.scrollTop;
-    const amount = 1 - Math.pow(IOS_EASE_REMAINING, elapsed / 16.667);
+    // Catch up more aggressively when fast wheel input builds distance. This
+    // keeps the viewport attached to the gesture instead of replaying a queue.
+    const speedPressure = Math.min(
+      0.24,
+      Math.max(0, Math.abs(distance) - 160) / 1300,
+    );
+    const adaptiveRemaining = Math.max(0.54, IOS_EASE_REMAINING - speedPressure);
+    const amount = 1 - Math.pow(adaptiveRemaining, elapsed / 16.667);
 
     if (Math.abs(distance) <= 0.35) {
       active.element.scrollTop = active.target;
@@ -103,7 +111,16 @@ export function installSmoothScroll(): void {
       active = { element, target: element.scrollTop, lastFrame: performance.now() };
     }
 
-    active.target = Math.max(0, Math.min(maximum, active.target + limitedDelta));
+    // Reverse immediately instead of replaying queued motion in the old direction.
+    if (Math.sign(active.target - element.scrollTop) !== Math.sign(limitedDelta)) {
+      active.target = element.scrollTop;
+    }
+
+    // Never let rapid wheel events build an unbounded animation backlog.
+    const lead = Math.min(MAX_SCROLL_LEAD, Math.max(240, element.clientHeight * 0.65));
+    const lowerBound = Math.max(0, element.scrollTop - lead);
+    const upperBound = Math.min(maximum, element.scrollTop + lead);
+    active.target = Math.max(lowerBound, Math.min(upperBound, active.target + limitedDelta));
     if (!frame) frame = window.requestAnimationFrame(tick);
   };
 
