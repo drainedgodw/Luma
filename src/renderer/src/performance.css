@@ -70,16 +70,21 @@ button:active {
   width: 240px;
   opacity: 0;
   pointer-events: none;
+  transition: opacity 180ms ease-out;
+}
+
+.explorer-flyout > .glass {
   transform: translate3d(-18px, 0, 0) scale(.985);
   transform-origin: left center;
-  transition:
-    transform 360ms var(--motion-spring),
-    opacity 180ms ease-out;
+  transition: transform 360ms var(--motion-spring);
 }
 
 .explorer-flyout[data-awake='true'] {
   opacity: 1;
   pointer-events: auto;
+}
+
+.explorer-flyout[data-awake='true'] > .glass {
   transform: translate3d(0, 0, 0) scale(1);
 }
 
