@@ -49,6 +49,13 @@ html[data-theme='liquid'] .rescue-row {
   touch-action: pan-y;
 }
 
+/* Keep precise touchpad scrolling on Chromium's compositor. */
+.cm-scroller,
+[data-smooth-scroll='always'] {
+  overscroll-behavior: contain;
+  will-change: scroll-position;
+}
+
 /* All common controls use explicit compositor-friendly properties, never all. */
 button {
   transition-property: transform, opacity, color, background-color, border-color, box-shadow;
@@ -96,10 +103,12 @@ nav[aria-label='Primary workspace'] {
 .explorer-flyout > .glass {
   transform: translate3d(-252px, 0, 0);
   transform-origin: left center;
-  clip-path: inset(0 0 0 100%);
+  opacity: 0;
+  visibility: hidden;
   transition:
     transform 420ms var(--motion-spring),
-    clip-path 420ms var(--motion-spring);
+    opacity 100ms linear,
+    visibility 0s linear 420ms;
 }
 
 .explorer-flyout[data-awake='true'] {
@@ -108,7 +117,12 @@ nav[aria-label='Primary workspace'] {
 
 .explorer-flyout[data-awake='true'] > .glass {
   transform: translate3d(0, 0, 0);
-  clip-path: inset(0);
+  opacity: 1;
+  visibility: visible;
+  transition:
+    transform 420ms var(--motion-spring),
+    opacity 120ms linear 70ms,
+    visibility 0s linear;
 }
 
 /* Wake from the full-height line immediately to the RIGHT of the nav rail. */
