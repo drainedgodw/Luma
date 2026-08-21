@@ -1,6 +1,7 @@
 import { BrowserWindow, app, ipcMain } from 'electron';
 import { join } from 'node:path';
 import { registerIpc } from './ipc';
+import { registerRecentReposIpc } from './recentRepos';
 import { registerGitHubIpc } from './githubIpc';
 import { registerIntelligenceIpc } from './intelligenceIpc';
 import { getWallpaper } from './wallpaper';
@@ -76,6 +77,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   registerIpc(() => win);
+  registerRecentReposIpc(() => win);
   registerGitHubIpc(() => win);
   registerIntelligenceIpc(() => win);
   createWindow();
