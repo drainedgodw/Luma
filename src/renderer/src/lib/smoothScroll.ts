@@ -11,6 +11,7 @@ interface ActiveScroll {
 const IOS_EASE_REMAINING = 0.78;
 const MAX_WHEEL_STEP = 180;
 const MAX_SCROLL_LEAD = 480;
+const MAX_STEP_PER_60HZ_FRAME = 36;
 
 function canScroll(element: HTMLElement, deltaY: number): boolean {
   const style = window.getComputedStyle(element);
@@ -60,14 +61,7 @@ export function installSmoothScroll(): void {
     const elapsed = Math.min(34, Math.max(8, now - active.lastFrame));
     active.lastFrame = now;
     const distance = active.target - active.element.scrollTop;
-    // Catch up more aggressively when fast wheel input builds distance. This
-    // keeps the viewport attached to the gesture instead of replaying a queue.
-    const speedPressure = Math.min(
-      0.24,
-      Math.max(0, Math.abs(distance) - 160) / 1300,
-    );
-    const adaptiveRemaining = Math.max(0.54, IOS_EASE_REMAINING - speedPressure);
-    const amount = 1 - Math.pow(adaptiveRemaining, elapsed / 16.667);
+    const amount = 1 - Math.pow(IOS_EASE_REMAINING, elapsed / 16.667);
 
     if (Math.abs(distance) <= 0.35) {
       active.element.scrollTop = active.target;
@@ -75,7 +69,12 @@ export function installSmoothScroll(): void {
       return;
     }
 
-    active.element.scrollTop += distance * amount;
+    // A frame may arrive late under Wayland or while Chromium repaints glass.
+    // Bound the visual step so a delayed frame cannot jump hundreds of pixels.
+    const desiredStep = distance * amount;
+    const maxStep = MAX_STEP_PER_60HZ_FRAME * (elapsed / 16.667);
+    active.element.scrollTop +=
+      Math.sign(desiredStep) * Math.min(Math.abs(desiredStep), maxStep);
     frame = window.requestAnimationFrame(tick);
   };
 
@@ -92,15 +91,14 @@ export function installSmoothScroll(): void {
 
     const origin = event.target instanceof Element ? event.target : null;
     if (!origin || origin.closest('.xterm, [data-native-scroll]')) return;
-    const forceSmooth = Boolean(origin.closest('.cm-editor, [data-smooth-scroll="always"]'));
 
     const element = findScrollContainer(origin, event.deltaY);
     if (!element) return;
 
     const pixelDelta = toPixels(event, element);
-    // Precision touchpads already provide small, inertial pixel deltas. Keeping
-    // those native avoids double smoothing and preserves direct manipulation.
-    if (!forceSmooth && event.deltaMode === 0 && Math.abs(pixelDelta) < 42) return;
+    // Precision touchpads already provide small inertial deltas. Leave them on
+    // Chromium's compositor in every view, including CodeMirror and Rescue.
+    if (event.deltaMode === 0 && Math.abs(pixelDelta) < 42) return;
 
     event.preventDefault();
     const limitedDelta = Math.sign(pixelDelta) * Math.min(Math.abs(pixelDelta), MAX_WHEEL_STEP);
