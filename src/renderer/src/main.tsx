@@ -1,11 +1,8 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
-import { installSmoothScroll } from './lib/smoothScroll';
 import './theme.css';
 import './performance.css';
-
-installSmoothScroll();
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

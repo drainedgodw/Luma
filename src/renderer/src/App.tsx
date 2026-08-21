@@ -20,6 +20,7 @@ import TerminalPanel from './components/TerminalPanel';
 import BisectView from './components/BisectView';
 import { Icon } from './components/Icons';
 import logo from './assets/logo.png';
+import logoMark from './assets/logo-mark.svg';
 import { api, gitCall } from './lib/api';
 
 type View = 'editor' | 'graph' | 'changes' | 'github' | 'intelligence' | 'languages' | 'settings' | 'rescue';
@@ -36,7 +37,9 @@ function Shell() {
   const [rebaseTarget, setRebaseTarget] = useState<string | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const pinned = settings.explorer === 'pinned';
+  const explorerRelevant = view === 'editor';
   const navigate = useCallback((next: View) => {
+    if (next !== 'editor') setExplorerAwake(false);
     startTransition(() => setView(next));
   }, []);
 
@@ -100,7 +103,7 @@ function Shell() {
 
     <div className="flex min-h-0 flex-1 gap-3 p-3">
       <nav aria-label="Primary workspace" className="glass flex w-16 flex-col items-center gap-1.5 py-3"><img src={logo} alt="" className="mb-1 h-8 w-8 rounded-xl"/><Dock active={pinned} run={() => update({ explorer: pinned ? 'auto' : 'pinned' })} label="Toggle explorer" text="Panel" icon={<Icon name="panel"/>}/><Dock active={view === 'editor'} run={() => navigate('editor')} label="Code editor" text="Code" icon={<Icon name="code"/>}/><Dock active={view === 'graph'} run={() => navigate('graph')} label="History and Orbit" text="History" icon={<Icon name="graph"/>}/><Dock active={view === 'changes'} run={() => navigate('changes')} label="Working tree and staged changes" text="Changes" icon={<Icon name="changes"/>} badge={dirty ? String(dirty) : null}/><Dock active={view === 'github'} run={() => navigate('github')} label="GitHub repositories" text="GitHub" icon={<b className="text-[10px]">GH</b>}/><Dock active={view === 'intelligence'} run={() => navigate('intelligence')} label="Trust, tests and language tools" text="Trust" icon={<span>◈</span>}/><Dock active={showTerminal} run={() => setShowTerminal(value => !value)} label="Integrated terminal" text="Term" icon={<Icon name="terminal"/>}/><Dock active={view === 'rescue'} run={() => navigate('rescue')} label="Reflog and recovery" text="Rescue" icon={<Icon name="shield"/>}/><Dock active={view === 'languages'} run={() => navigate('languages')} label="Language packs" text="Langs" icon={<Icon name="grid"/>}/><div className="mt-auto"><Dock active={view === 'settings'} run={() => navigate('settings')} label="Settings" text="Setup" icon={<Icon name="gear"/>}/></div></nav>
-      <ExplorerWake onWake={() => setExplorerAwake(true)} enabled={!pinned}/><FileTree awake={explorerAwake} onCollapse={() => setExplorerAwake(false)}/>
+      <ExplorerWake onWake={() => setExplorerAwake(true)} enabled={!pinned && explorerRelevant}/>{(pinned || explorerRelevant) && <FileTree awake={explorerAwake} onCollapse={() => setExplorerAwake(false)}/>} 
       <main className="flex min-w-0 flex-1 flex-col gap-2">{view === 'editor' && <EditorTabs/>}<div className={`min-h-0 flex-1 ${showTerminal ? 'flex flex-col gap-2' : 'flex flex-col'}`}><div className="min-h-0 flex-1"><div key={viewKey} className="view-surface h-full min-h-0">{rebaseTarget ? <RebaseView targetBranch={rebaseTarget} onClose={() => setRebaseTarget(null)}/> : view === 'graph' ? <GraphView onRebase={setRebaseTarget}/> : view === 'changes' ? <ChangesView onOpenFile={openFile}/> : view === 'github' ? <GitHubView/> : view === 'intelligence' ? <IntelligenceView/> : view === 'languages' ? <StoreView/> : view === 'settings' ? <SettingsView/> : view === 'rescue' ? <RescueView/> : <EditorWorkspace/>}</div></div>{showTerminal && <div className="h-[38%] min-h-[160px]"><TerminalPanel onClose={() => setShowTerminal(false)}/></div>}</div></main>
     </div>
     {showPalette && <CommandPalette commands={commands} onClose={() => setShowPalette(false)}/>} {showLog && <CommandLog onClose={() => setShowLog(false)}/>} {status?.state === 'bisect' && <BisectView active onClose={() => {}}/>}<Toast/>{showOnboarding && <Onboarding close={() => { localStorage.setItem('luma.onboarding.complete', '1'); setShowOnboarding(false); }} go={(next) => { navigate(next); setShowOnboarding(false); }}/>} 
@@ -124,8 +127,41 @@ function Dock({ active, run, label, icon, text, badge }: { active: boolean; run:
 function Welcome() {
   const { openRepo } = useStore();
   const [recent, setRecent] = useState<string[]>([]);
-  useEffect(() => { void api.recentRepos().then(setRecent); }, []);
-  return <div className="welcome-shell flex h-full items-center justify-center p-6"><section className="welcome-card flex flex-col items-center gap-6"><img src={logo} alt="Luma" className="welcome-logo h-24 w-24 rounded-3xl"/><div className="text-center"><h1 className="welcome-title text-5xl font-bold tracking-[.3em]">LUMA</h1><p className="welcome-copy mt-3">See what Git will do before it does it.</p><p className="welcome-copy-muted mt-1 text-xs">Visual history · previewable operations · recoverable mistakes</p></div><button className="btn btn-primary welcome-action px-8 py-3" onClick={() => openRepo()}>Open a Git repository</button>{recent.length > 0 && <div className="welcome-recents p-3"><div className="mb-2 px-2 text-[10px] uppercase tracking-wider text-black/45">Recent repositories</div>{recent.map(path => <button className="block w-full truncate rounded-lg px-3 py-2 text-left font-mono text-xs text-black/65 hover:bg-black/6" key={path} onClick={() => openRepo(path)}>{path}</button>)}</div>}<div className="text-[10px] text-[#934b08]">Developer Preview · keep a remote backup</div></section></div>;
+  const [selected, setSelected] = useState(-1);
+
+  useEffect(() => {
+    let active = true;
+    void api.recentRepos().then((paths) => {
+      if (!active) return;
+      setRecent(paths);
+      setSelected(paths.length ? 0 : -1);
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (!recent.length) return;
+      if (event.target instanceof Element && event.target.closest('button, input, textarea, select')) return;
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault();
+        const direction = event.key === 'ArrowDown' ? 1 : -1;
+        setSelected((current) => current < 0 ? (direction > 0 ? 0 : recent.length - 1) : (current + direction + recent.length) % recent.length);
+      } else if (event.key === 'Enter' && selected >= 0) {
+        event.preventDefault();
+        void openRepo(recent[selected]);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [openRepo, recent, selected]);
+
+  return <div className="welcome-shell flex h-full p-3"><section className="welcome-surface flex h-full w-full flex-col items-center justify-center gap-6 p-8"><img src={logoMark} alt="Luma" className="welcome-logo h-24 w-24 object-contain"/><div className="text-center"><h1 className="text-5xl font-bold tracking-[.3em] text-lilac">LUMA</h1><p className="mt-3 text-white/60">See what Git will do before it does it.</p><p className="mt-1 text-xs text-white/35">Visual history · previewable operations · recoverable mistakes</p></div><button className="btn btn-primary px-8 py-3" onClick={() => openRepo()}>Open directory</button>{recent.length > 0 && <div className="welcome-recents w-full max-w-xl p-3" role="listbox" aria-label="Recent directories"><div className="mb-2 flex items-center px-2 text-[10px] uppercase tracking-wider text-white/35"><span>Recent directories</span><span className="ml-auto normal-case tracking-normal text-white/25">↑ ↓ select · Enter open</span></div>{recent.map((path, index) => <button className="welcome-recent-row flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left" data-selected={selected === index ? 'true' : 'false'} role="option" aria-selected={selected === index} key={path} onMouseEnter={() => setSelected(index)} onClick={() => openRepo(path)}><span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium text-white/75">{directoryName(path)}</span><span className="mt-0.5 block truncate font-mono text-[10px] text-white/35">{path}</span></span><span className="text-[11px] text-white/25">↵</span></button>)}</div>}<div className="text-[10px] text-amber">Developer Preview · keep a remote backup</div></section></div>;
+}
+
+function directoryName(path: string): string {
+  const clean = path.replace(/[\\/]+$/, '');
+  return clean.split(/[\\/]/).pop() || path;
 }
 
 export default function App() { return <StoreProvider><SettingsProvider><WorkspaceProvider><Wallpaper/><div className="cosmos"/><Shell/></WorkspaceProvider></SettingsProvider></StoreProvider>; }

@@ -3,10 +3,10 @@ import { contextBridge, ipcRenderer } from 'electron';
 const SECURE_GIT_CHANNELS = new Set(['fetch', 'pull', 'push']);
 
 contextBridge.exposeInMainWorld('luma', {
-  openRepoDialog: () => ipcRenderer.invoke('repo:open'),
-  openRepoPath: (p: string) => ipcRenderer.invoke('repo:openPath', p),
+  openRepoDialog: () => ipcRenderer.invoke('repo:directory:open'),
+  openRepoPath: (p: string) => ipcRenderer.invoke('repo:directory:openPath', p),
   repoPath: () => ipcRenderer.invoke('repo:path'),
-  recentRepos: () => ipcRenderer.invoke('repo:last'),
+  recentRepos: () => ipcRenderer.invoke('repo:directory:recent'),
   gitInvoke: (channel: string, ...args: unknown[]) => channel === 'commit'
     ? ipcRenderer.invoke('intel:git:commit', ...args)
     : channel === 'rewindSoft'
