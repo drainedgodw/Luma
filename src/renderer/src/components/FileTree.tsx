@@ -27,7 +27,7 @@ interface Menu {
 
 /**
  * Explorer shutter. Pinned: always in place. Auto: a transform-only overlay
- * that wakes from a small hotspot on the left edge without reflowing the app.
+ * that wakes from the full-height line on the right edge of the nav rail.
  */
 export default function FileTree({ awake, onCollapse }: { awake: boolean; onCollapse: () => void }) {
   const { repo } = useStore();
@@ -322,30 +322,11 @@ function MenuItem({ label, hint, onClick, danger }: { label: string; hint?: stri
   );
 }
 
-/** Small, deliberate hotspot on the left edge that wakes auto Explorer. */
+/** Full-height line on the right edge of the nav rail that wakes Explorer. */
 export function ExplorerWake({ onWake, enabled }: { onWake: () => void; enabled: boolean }) {
-  const wakeTimer = useRef<number | null>(null);
-  const cancelWake = useCallback(() => {
-    if (wakeTimer.current !== null) window.clearTimeout(wakeTimer.current);
-    wakeTimer.current = null;
-  }, []);
-
-  useEffect(() => () => cancelWake(), [cancelWake]);
   if (!enabled) return null;
-
   return (
-    <div
-      className="explorer-wake-zone"
-      aria-hidden="true"
-      onPointerEnter={() => {
-        cancelWake();
-        wakeTimer.current = window.setTimeout(() => {
-          wakeTimer.current = null;
-          onWake();
-        }, 90);
-      }}
-      onPointerLeave={cancelWake}
-    >
+    <div className="explorer-wake-zone" aria-hidden="true" onPointerEnter={onWake}>
       <span className="explorer-wake-handle" />
     </div>
   );
