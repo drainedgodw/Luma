@@ -18,10 +18,12 @@ readonly LAUNCHER="$BIN_DIR/luma"
 readonly DESKTOP_FILE="$DATA_HOME/applications/luma.desktop"
 readonly ICON_FILE="$DATA_HOME/icons/hicolor/512x512/apps/luma.png"
 readonly API_URL="https://api.github.com/repos/$REPO"
+readonly NIGHTLY_URL="https://github.com/$REPO/releases/download/nightly"
+readonly ICON_URL="https://raw.githubusercontent.com/$REPO/$REF/build/icon.png"
 readonly SOURCE_URL="https://github.com/$REPO/archive/refs/heads/$REF.tar.gz"
 
 ACTION="install"
-CHANNEL="${LUMA_CHANNEL:-auto}"
+CHANNEL="${LUMA_CHANNEL:-release}"
 TMP_DIR=""
 APPIMAGE=""
 VERSION=""
@@ -54,9 +56,10 @@ Channels:
 
 Environment:
   LUMA_REF=main                 Source branch to build
-  LUMA_CHANNEL=auto|release|source
-  LUMA_APPIMAGE_FILE=/path      Install a local AppImage
-  LUMA_NO_SANDBOX=1            Add --no-sandbox to the launcher
+  LUMA_CHANNEL=release|source|auto
+  LUMA_APPIMAGE_FILE=/path      Install a local AppImage (testing/manual package)
+  LUMA_ICON_FILE=/path          Use a local PNG icon instead of build/icon.png
+  LUMA_NO_SANDBOX=1            Add --no-sandbox to the generated launcher
 
 Rerun the installer to update Luma.
 USAGE
@@ -79,10 +82,13 @@ parse_args() {
 }
 
 need() { command -v "$1" >/dev/null 2>&1 || die "Required command is missing: $1"; }
+
 fetch() {
   local url="$1" output="$2"
-  curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error --retry 3 --connect-timeout 15 --output "$output" "$url"
+  curl --proto '=https' --tlsv1.2 --fail --location --silent --show-error \
+    --retry 3 --connect-timeout 15 --output "$output" "$url"
 }
+
 sha256_file() {
   local file="$1"
   if command -v sha256sum >/dev/null 2>&1; then sha256sum "$file" | awk '{print $1}'
@@ -98,19 +104,42 @@ refresh_desktop() {
   command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$DATA_HOME/applications" >/dev/null 2>&1 || true
   command -v gtk-update-icon-cache >/dev/null 2>&1 && gtk-update-icon-cache -f -t "$DATA_HOME/icons/hicolor" >/dev/null 2>&1 || true
   command -v xdg-desktop-menu >/dev/null 2>&1 && xdg-desktop-menu forceupdate >/dev/null 2>&1 || true
+  command -v kbuildsycoca6 >/dev/null 2>&1 && kbuildsycoca6 >/dev/null 2>&1 || true
+  command -v kbuildsycoca5 >/dev/null 2>&1 && kbuildsycoca5 >/dev/null 2>&1 || true
 }
+
 remove_install() {
   rm -rf -- "$INSTALL_ROOT"
   rm -f -- "$LAUNCHER" "$DESKTOP_FILE" "$ICON_FILE"
   refresh_desktop
   log 'Removed the application, launcher, desktop entry and icon.'
 }
+
 purge_user_data() {
-  rm -rf -- "$CONFIG_HOME/Luma" "$CONFIG_HOME/luma" "$CACHE_HOME/Luma" "$CACHE_HOME/luma" "$STATE_HOME/Luma" "$STATE_HOME/luma" "$DATA_HOME/Luma" "$DATA_HOME/luma"
+  rm -rf -- \
+    "$CONFIG_HOME/Luma" "$CONFIG_HOME/luma" \
+    "$CACHE_HOME/Luma" "$CACHE_HOME/luma" \
+    "$STATE_HOME/Luma" "$STATE_HOME/luma" \
+    "$DATA_HOME/Luma" "$DATA_HOME/luma"
   log 'Removed Luma settings, cache, sessions and encrypted GitHub credentials.'
 }
 
 resolve_release() {
+  local nightly_sums="$TMP_DIR/nightly-SHA256SUMS.txt" nightly_asset expected actual
+  if fetch "$NIGHTLY_URL/SHA256SUMS.txt" "$nightly_sums"; then
+    nightly_asset="$(awk '$2 ~ /[.]AppImage$/ {print $2; exit}' "$nightly_sums")"
+    expected="$(awk '$2 ~ /[.]AppImage$/ {print $1; exit}' "$nightly_sums")"
+    if [[ -n "$nightly_asset" && -n "$expected" ]]; then
+      APPIMAGE="$TMP_DIR/$nightly_asset"
+      log 'Downloading the ready-to-run nightly AppImage...'
+      fetch "$NIGHTLY_URL/$nightly_asset" "$APPIMAGE"
+      actual="$(sha256_file "$APPIMAGE")"
+      [[ "$actual" == "$expected" ]] || die 'Nightly AppImage checksum verification failed.'
+      VERSION="nightly"
+      return 0
+    fi
+  fi
+
   local json="$TMP_DIR/releases.json" resolved
   fetch "$API_URL/releases?per_page=20" "$json" || return 1
   command -v python3 >/dev/null 2>&1 || return 1
@@ -121,13 +150,18 @@ for release in releases:
     if release.get('draft'):
         continue
     assets = {a['name']: a['browser_download_url'] for a in release.get('assets', [])}
-    app = next(((n, u) for n, u in assets.items() if n.endswith('.AppImage')), None)
+    app = next(((name, url) for name, url in assets.items() if name.endswith('.AppImage')), None)
     sums = assets.get('SHA256SUMS.txt')
     if app and sums:
-        print(release['tag_name']); print(app[0]); print(app[1]); print(sums); break
+        print(release['tag_name'])
+        print(app[0])
+        print(app[1])
+        print(sums)
+        break
 PY
 )"
   [[ -n "$resolved" ]] || return 1
+
   local tag asset_name app_url sums_url expected actual
   tag="$(sed -n '1p' <<< "$resolved")"
   asset_name="$(sed -n '2p' <<< "$resolved")"
@@ -165,6 +199,7 @@ resolve_appimage() {
     VERSION="local"
     return
   fi
+
   case "$CHANNEL" in
     release) resolve_release || die 'No GitHub Release with AppImage and SHA256SUMS.txt is available.' ;;
     source) build_from_source ;;
@@ -177,8 +212,12 @@ install_appimage() {
   rm -rf -- "$next" "$old"
   mkdir -p -- "$next"
   install -m755 "$APPIMAGE" "$next/Luma.AppImage"
+
   log 'Extracting the AppImage for FUSE-independent launches...'
-  (cd -- "$next" && ./Luma.AppImage --appimage-extract >/dev/null)
+  (
+    cd -- "$next"
+    ./Luma.AppImage --appimage-extract >/dev/null
+  )
   extracted="$next/squashfs-root"
   [[ -x "$extracted/luma" ]] || die 'The AppImage does not contain the expected luma executable.'
   mv -- "$extracted" "$next/app"
@@ -194,8 +233,14 @@ install_appimage() {
   } > "$LAUNCHER"
   chmod 755 "$LAUNCHER"
 
-  icon="$(find "$next/app" -type f \( -iname 'luma.png' -o -path '*/icons/*/apps/*.png' \) -print -quit)"
-  [[ -n "$icon" ]] || die 'The AppImage does not contain a PNG application icon.'
+  icon="$next/icon.png"
+  if [[ -n "${LUMA_ICON_FILE:-}" ]]; then
+    install -m644 "$LUMA_ICON_FILE" "$icon"
+  else
+    log 'Downloading the Luma application icon...'
+    fetch "$ICON_URL" "$icon"
+  fi
+  [[ -s "$icon" ]] || die 'The Luma PNG icon could not be installed.'
   install -m644 "$icon" "$ICON_FILE"
 
   cat > "$DESKTOP_FILE" <<EOF
@@ -207,7 +252,7 @@ GenericName=Git IDE
 Comment=Visual Git-first IDE
 Exec="$LAUNCHER" %U
 TryExec=$LAUNCHER
-Icon=luma
+Icon=$ICON_FILE
 Terminal=false
 Categories=Development;IDE;RevisionControl;
 Keywords=Git;IDE;History;Diff;Repository;
@@ -220,9 +265,12 @@ EOF
   mv -- "$next" "$INSTALL_ROOT"
   rm -rf -- "$old"
   refresh_desktop
+
   log "Installed Luma $VERSION in $INSTALL_ROOT."
   log 'The Luma icon is now available in the application menu.'
-  if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then warn "$BIN_DIR is not in PATH; the application menu still works."; fi
+  if [[ ":$PATH:" != *":$BIN_DIR:"* ]]; then
+    warn "$BIN_DIR is not in PATH; the application menu still works."
+  fi
 }
 
 main() {
@@ -232,9 +280,12 @@ main() {
     uninstall) remove_install; exit 0 ;;
     purge) remove_install; purge_user_data; exit 0 ;;
   esac
+
   [[ "$(uname -s)" == "Linux" ]] || die 'The binary installer currently supports Linux only.'
   case "$(uname -m)" in x86_64|amd64) ;; *) die 'The current AppImage is supported on Linux x86_64 only.' ;; esac
-  need curl; need tar; need find
+  need curl
+  need tar
+  need find
   TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/luma-install.XXXXXX")"
   resolve_appimage
   install_appimage
