@@ -1,19 +1,3 @@
 import { useWorkspace } from '../workspace';
 import CodeEditor from '../components/CodeEditor';
-
-export default function EditorWorkspace() {
-  const { active } = useWorkspace();
-  return (
-    <div className="glass flex h-full min-h-0 flex-col overflow-hidden">
-      {active ? (
-        <CodeEditor path={active} />
-      ) : (
-        <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-          <div className="text-5xl opacity-20">⌘</div>
-          <div className="text-sm text-white/40">No file open</div>
-          <div className="text-xs text-white/25">Pick a file in the Explorer, or open one from Changes</div>
-        </div>
-      )}
-    </div>
-  );
-}
+export default function EditorWorkspace() { const { active, tabs } = useWorkspace(); return <div className="glass flex h-full min-h-0 flex-col overflow-hidden">{tabs.length ? tabs.map((tab) => <div key={tab.path} className={active === tab.path ? 'min-h-0 flex-1' : 'hidden'}><CodeEditor path={tab.path}/></div>) : <div className="flex h-full flex-col items-center justify-center gap-3 text-center"><div className="text-5xl opacity-20">⌘</div><div className="text-sm text-white/45">Open a file to start coding</div><div className="text-xs text-white/25">Choose a file in Explorer or press Ctrl+P for Quick Open</div><div className="mt-2 grid grid-cols-2 gap-x-5 gap-y-2 text-left text-[10px] text-white/30"><span>Quick Open</span><kbd className="text-lilac">Ctrl+P</kbd><span>Search workspace</span><kbd className="text-lilac">Ctrl+Shift+F</kbd><span>Command palette</span><kbd className="text-lilac">Ctrl+Shift+P</kbd><span>Terminal</span><kbd className="text-lilac">Ctrl+`</kbd></div></div>}</div>; }
