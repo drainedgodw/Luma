@@ -125,29 +125,14 @@ purge_user_data() {
 }
 
 resolve_release() {
-  local nightly_sums="$TMP_DIR/nightly-SHA256SUMS.txt" nightly_asset expected actual
-  if fetch "$NIGHTLY_URL/SHA256SUMS.txt" "$nightly_sums"; then
-    nightly_asset="$(awk '$2 ~ /[.]AppImage$/ {print $2; exit}' "$nightly_sums")"
-    expected="$(awk '$2 ~ /[.]AppImage$/ {print $1; exit}' "$nightly_sums")"
-    if [[ -n "$nightly_asset" && -n "$expected" ]]; then
-      APPIMAGE="$TMP_DIR/$nightly_asset"
-      log 'Downloading the ready-to-run nightly AppImage...'
-      fetch "$NIGHTLY_URL/$nightly_asset" "$APPIMAGE"
-      actual="$(sha256_file "$APPIMAGE")"
-      [[ "$actual" == "$expected" ]] || die 'Nightly AppImage checksum verification failed.'
-      VERSION="nightly"
-      return 0
-    fi
-  fi
-
   local json="$TMP_DIR/releases.json" resolved
-  fetch "$API_URL/releases?per_page=20" "$json" || return 1
-  command -v python3 >/dev/null 2>&1 || return 1
-  resolved="$(python3 - "$json" <<'PY'
+  fetch "$API_URL/releases?per_page=20" "$json" || json=''
+  if [[ -n "$json" ]] && command -v python3 >/dev/null 2>&1; then
+    resolved="$(python3 - "$json" <<'PY'
 import json, sys
 releases = json.load(open(sys.argv[1], encoding='utf-8'))
 for release in releases:
-    if release.get('draft'):
+    if release.get('draft') or release.get('prerelease') or release.get('tag_name') == 'nightly':
         continue
     assets = {a['name']: a['browser_download_url'] for a in release.get('assets', [])}
     app = next(((name, url) for name, url in assets.items() if name.endswith('.AppImage')), None)
@@ -160,22 +145,42 @@ for release in releases:
         break
 PY
 )"
-  [[ -n "$resolved" ]] || return 1
+  fi
 
-  local tag asset_name app_url sums_url expected actual
-  tag="$(sed -n '1p' <<< "$resolved")"
-  asset_name="$(sed -n '2p' <<< "$resolved")"
-  app_url="$(sed -n '3p' <<< "$resolved")"
-  sums_url="$(sed -n '4p' <<< "$resolved")"
-  APPIMAGE="$TMP_DIR/$asset_name"
-  log "Downloading release $tag..."
-  fetch "$sums_url" "$TMP_DIR/SHA256SUMS.txt"
-  fetch "$app_url" "$APPIMAGE"
-  expected="$(awk -v file="$asset_name" '$2 == file {print $1; exit}' "$TMP_DIR/SHA256SUMS.txt")"
-  [[ -n "$expected" ]] || die "SHA256SUMS.txt does not contain $asset_name."
-  actual="$(sha256_file "$APPIMAGE")"
-  [[ "$actual" == "$expected" ]] || die 'AppImage checksum verification failed.'
-  VERSION="$tag"
+  if [[ -n "$resolved" ]]; then
+    local tag asset_name app_url sums_url expected actual
+    tag="$(sed -n '1p' <<< "$resolved")"
+    asset_name="$(sed -n '2p' <<< "$resolved")"
+    app_url="$(sed -n '3p' <<< "$resolved")"
+    sums_url="$(sed -n '4p' <<< "$resolved")"
+    APPIMAGE="$TMP_DIR/$asset_name"
+    log "Downloading Luma release $tag..."
+    fetch "$sums_url" "$TMP_DIR/SHA256SUMS.txt"
+    fetch "$app_url" "$APPIMAGE"
+    expected="$(awk -v file="$asset_name" '$2 == file {print $1; exit}' "$TMP_DIR/SHA256SUMS.txt")"
+    [[ -n "$expected" ]] || die "SHA256SUMS.txt does not contain $asset_name."
+    actual="$(sha256_file "$APPIMAGE")"
+    [[ "$actual" == "$expected" ]] || die 'AppImage checksum verification failed.'
+    VERSION="$tag"
+    return 0
+  fi
+
+  local nightly_sums="$TMP_DIR/nightly-SHA256SUMS.txt" nightly_asset expected actual
+  if fetch "$NIGHTLY_URL/SHA256SUMS.txt" "$nightly_sums"; then
+    nightly_asset="$(awk '$2 ~ /[.]AppImage$/ {print $2; exit}' "$nightly_sums")"
+    expected="$(awk '$2 ~ /[.]AppImage$/ {print $1; exit}' "$nightly_sums")"
+    if [[ -n "$nightly_asset" && -n "$expected" ]]; then
+      APPIMAGE="$TMP_DIR/$nightly_asset"
+      log 'No stable release found; downloading the nightly AppImage...'
+      fetch "$NIGHTLY_URL/$nightly_asset" "$APPIMAGE"
+      actual="$(sha256_file "$APPIMAGE")"
+      [[ "$actual" == "$expected" ]] || die 'Nightly AppImage checksum verification failed.'
+      VERSION="nightly"
+      return 0
+    fi
+  fi
+
+  return 1
 }
 
 build_from_source() {
