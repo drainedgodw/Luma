@@ -141,15 +141,15 @@ Never paste a token into an issue, screenshot, terminal recording, or chat.
 
 ## Keyboard and Orbit
 
-- Trackpad/wheel: pan
-- Ctrl/Cmd + wheel or pinch: zoom
-- Drag: pan
-- Arrow keys or WASD: move
-- Shift: faster movement
-- `+` / `-`: zoom
-- `0`: reset view
-- Ctrl/Cmd + `` ` ``: terminal
+- Orbit: drag rotates left/right and tilts up/down, Shift-drag or right-drag pans, wheel zooms, `Fit` resets the view
+- Ctrl/Cmd + `P`: quick open file
+- Ctrl/Cmd + `F`: find in file (editor) / search workspace
+- Ctrl/Cmd + Shift + `F`: search text across the project
 - Ctrl/Cmd + Shift + `P`: command palette
+- Ctrl/Cmd + `B`: pin/auto-hide Explorer
+- Ctrl/Cmd + `` ` ``: terminal
+
+A full walkthrough of every section lives in [docs/USERGUIDE.md](docs/USERGUIDE.md).
 
 ## Project structure
 
