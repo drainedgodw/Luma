@@ -21,9 +21,22 @@ section.glass > header + .overflow-auto > .relative > button.absolute {
   contain-intrinsic-size: auto 56px;
 }
 
-.overflow-y-auto .glass-soft:not(.rescue-row) {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 56px;
+/* Cards inside scrolling lists must not carry their own backdrop-filter:
+ * every blur repaints while content moves behind it, which is the main
+ * source of wheel-scroll jank on Wayland. The already-blurred glass parent
+ * provides the frosted look; cards get a cheap translucent fill instead. */
+.overflow-y-auto .glass-soft:not(.rescue-row),
+.overflow-auto .glass-soft:not(.rescue-row) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: rgba(255, 255, 255, .035);
+}
+
+html[data-theme='liquid'] .overflow-y-auto .glass-soft:not(.rescue-row),
+html[data-theme='liquid'] .overflow-auto .glass-soft:not(.rescue-row) {
+  background: rgba(10, 14, 24, .34);
+  border-color: rgba(255, 255, 255, .16);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12);
 }
 
 /* Rescue has only a short reflog. Keeping every row ready and letting the
