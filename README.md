@@ -165,6 +165,7 @@ tests/          parser, Git integration, security and recovery tests
 
 - Security issue: follow [SECURITY.md](SECURITY.md); do not open a public exploit report.
 - Bug or feature proposal: open a GitHub issue with OS, display server, Git version, reproduction steps and logs with secrets removed.
+- Quick feedback or questions: ping the author on Telegram — [@upsetsay](https://t.me/upsetsay).
 - Contribution: read [CONTRIBUTING.md](CONTRIBUTING.md).
 - Changes: see [CHANGELOG.md](CHANGELOG.md).
 

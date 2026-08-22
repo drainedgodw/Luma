@@ -142,6 +142,7 @@ The GitHub section connects to your account (credentials are stored locally in y
 
 - Something looks wrong? Check **Help** in the top bar for the built-in getting-started guide.
 - Found a bug or have an idea? Open an issue at <https://github.com/drainedgodw/Luma/issues>.
+- Prefer a quick chat? Message the author on Telegram: [@upsetsay](https://t.me/upsetsay).
 - Security-related reports: see `SECURITY.md`.
 
 ---
