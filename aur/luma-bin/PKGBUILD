@@ -1,0 +1,44 @@
+# Maintainer: drainedgodw <https://github.com/drainedgodw>
+# Contributor: drainedgodw <https://github.com/drainedgodw>
+
+pkgname=luma-bin
+pkgver=0.1.0
+pkgrel=1
+pkgdesc='Visual Git-first IDE with 3D commit graph, interactive rebase, and built-in editor'
+url='https://github.com/drainedgodw/Luma'
+arch=('x86_64')
+license=('MIT')
+depends=('expat' 'glib2' 'nss' 'nspr' 'cairo' 'dbus' 'libdrm' 'gdk-pixbuf2' 'gtk3'
+         'at-spi2-core' 'alsa-lib' 'libcups' 'libxcomposite' 'libxdamage' 'libxfixes'
+         'libxrandr' 'libxtst' 'pango' 'mesa' 'libxkbcommon' 'wayland')
+provides=('luma')
+conflicts=('luma' 'luma-git')
+options=('!strip' '!debug')
+
+source_x86_64=("https://github.com/drainedgodw/Luma/releases/download/v${pkgver}/Luma-${pkgver}.AppImage")
+sha256sums_x86_64=('0a55a585bd5f298644a14fced26552fd689bec0a44e36e51148d6a938d924a4c')
+
+noextract=("Luma-${pkgver}.AppImage")
+
+prepare() {
+    cd "${srcdir}"
+    chmod +x "Luma-${pkgver}.AppImage"
+    ./Luma-${pkgver}.AppImage --appimage-extract 'luma.png' 'luma.desktop' >/dev/null 2>&1 || \
+        ./Luma-${pkgver}.AppImage --appimage-extract >/dev/null
+}
+
+package() {
+    install -Dm755 "${srcdir}/Luma-${pkgver}.AppImage" \
+        "${pkgdir}/opt/luma/Luma-${pkgver}.AppImage"
+    install -d "${pkgdir}/usr/bin"
+    ln -s "/opt/luma/Luma-${pkgver}.AppImage" "${pkgdir}/usr/bin/luma"
+
+    install -Dm644 "${srcdir}/squashfs-root/luma.png" \
+        "${pkgdir}/usr/share/icons/hicolor/512x512/apps/luma.png"
+    sed -e "s|^Exec=.*|Exec=/usr/bin/luma|" \
+        -e "s|^Icon=.*|Icon=luma|" \
+        -e "/^TryExec=/d" \
+        "${srcdir}/squashfs-root/luma.desktop" > luma.desktop
+    install -Dm644 luma.desktop "${pkgdir}/usr/share/applications/luma.desktop"
+    install -Dm644 /dev/null "${pkgdir}/usr/share/licenses/${pkgname}/LICENSE"
+}
