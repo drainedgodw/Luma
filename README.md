@@ -6,73 +6,32 @@
 
 **See what Git will do before it does it.**
 
-A Linux-first visual Git workspace built around understandable history, previewable operations, and recovery from mistakes.
+A Linux-first visual Git workspace: understandable history, previewable operations, and recovery from mistakes.
 
 ![platform](https://img.shields.io/badge/platform-Linux-1793d1) ![license](https://img.shields.io/badge/license-MIT-22c55e) ![status](https://img.shields.io/badge/status-developer%20preview-f59e0b)
 
 </div>
 
 > [!WARNING]
-> Luma 0.1 is a developer preview, not a stable release. Keep a remote backup and begin with non-critical repositories. Experimental features are labelled below.
+> Luma 0.1 is a developer preview. Keep a remote backup and begin with non-critical repositories.
 
 ## Why Luma?
 
-Most IDEs treat Git as a sidebar. Luma treats repository history as the workspace itself: inspect a commit in Orbit, understand its diff and risk, preview a rewrite, and retain a recovery point before moving HEAD.
-
-The first release focuses on three promises:
-
-1. **Understand history visually.**
-2. **Preview dangerous operations before applying them.**
-3. **Recover when something goes wrong.**
-
-## Feature maturity
-
-| Area | Status | Notes |
-| --- | --- | --- |
-| History, commit graph and diffs | Beta | Lanes and Orbit views |
-| Staging and commits | Beta | Secret Guard scans staged additions before commit |
-| Branches, stash, bisect and reflog | Beta | Uses the system Git executable |
-| Rebase/reset/merge preview | Experimental | Preview quality depends on the operation; review the output |
-| Rollback checkpoints | Experimental | Reset creates `luma-before-rollback-*`; dirty state still matters |
-| GitHub PAT, clone, fetch, pull and push | Experimental | Fine-grained PAT or existing SSH keys |
-| Workspace Trust and Tasks | Experimental | Tasks and integrated terminal require explicit trust |
-| Risk Map | Experimental | Local churn and local test results, not GitHub CI status yet |
-| Language Intelligence | Prototype | Editor autocomplete plus basic delimiter checks and textual symbol search |
-| Project-wide replacement | Prototype | Textual replacement, not semantic LSP rename; review the diff |
-| Session Capsules | Prototype | Tabs, note, branch metadata and terminal open/closed state; PTY processes are not restored |
+Most IDEs treat Git as a sidebar. Luma treats history as the workspace itself: inspect commits in a 3D graph, preview a rewrite before applying it, and keep a recovery point before moving HEAD.
 
 ## Install
 
-### Requirements
-
-- Linux x86_64 (Wayland or X11)
-- Git
-- A POSIX shell for the integrated terminal
-- FUSE 2 for direct AppImage launch, or use extraction mode below
-
-The AppImage does **not** require Node.js or npm.
-
-### AppImage
-
-Download the latest **prerelease** from [GitHub Releases](https://github.com/drainedgodw/Luma/releases). Verify the published SHA-256 checksum, then:
+One command — installs to `~/.local`, adds Luma to your application menu, no Node.js needed:
 
 ```sh
-chmod +x Luma-*.AppImage
-./Luma-*.AppImage --ozone-platform-hint=auto
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/drainedgodw/Luma/main/install.sh)"
 ```
 
-If FUSE is unavailable:
+Run it again to update. Remove with `-- --uninstall` (keep settings) or `-- --purge` (remove everything).
 
-```sh
-./Luma-*.AppImage --appimage-extract
-./squashfs-root/luma --ozone-platform-hint=auto
-```
+Manual download is also available from [GitHub Releases](https://github.com/drainedgodw/Luma/releases) — verify the published SHA-256 checksum.
 
-If Electron sandboxing is unavailable on the system, use `--no-sandbox` only as a temporary troubleshooting measure and understand the reduced isolation.
-
-### Development build without managing Node
-
-The supported source workflow downloads a private, compatible Node 22 toolchain into the ignored `.luma/` directory. It does not replace your system Node, edit shell configuration, or require nvm/fnm/Volta. Fish users run the same command as Bash users:
+### From source
 
 ```sh
 git clone https://github.com/drainedgodw/Luma.git
@@ -80,76 +39,62 @@ cd Luma
 bash scripts/bootstrap.sh dev
 ```
 
-On the first run, the bootstrap:
+The bootstrap downloads a private, compatible Node 22 into the ignored `.luma/` directory — it does not touch your system Node or shell config. See `bash scripts/bootstrap.sh --help` for test/build/clean commands.
 
-1. detects Linux/macOS and CPU architecture;
-2. downloads the latest compatible Node 22 archive from nodejs.org;
-3. verifies it against the official SHA-256 manifest;
-4. installs `package-lock.json` with lifecycle scripts disabled;
-5. runs only the reviewed `electron`, `esbuild` and `node-pty` installers;
-6. rebuilds `node-pty` for Electron and checks the result before launch.
+## Features
 
-It also ignores inherited `ELECTRON_SKIP_BINARY_DOWNLOAD` and npm `ignore-scripts` settings for this run, so a global npm/Fish configuration cannot silently leave Electron uninstalled. No file in `node_modules` should be downloaded or edited manually.
+- **History** — commit graph in two views: classic Lanes and interactive 3D Orbit (drag to rotate, wheel to zoom)
+- **Changes** — staging by drag & drop, diffs, conflict resolution, commit messages with a template history
+- **Visual rebase** — reorder, squash, fixup, reword and drop commits; cherry-pick, revert, tags, merge strategy choice
+- **Safety net** — Secret Guard scans staged additions, every rollback creates a checkpoint branch, Rescue browses the reflog, bisect and stash included
+- **Editor** — CodeMirror 6 with syntax highlighting for 8 languages, tabs, find & replace, project-wide search (Ctrl+Shift+F), quick open (Ctrl+P)
+- **Terminal** — integrated terminal, unlocked per repository via Workspace Trust
+- **GitHub** — fine-grained PAT or SSH keys, clone, fetch, pull, push; the token is encrypted and never stored in plain text
+- **Languages & Ecosystem** — detects runtimes and project dependencies, installs packages and frameworks with a whitelisted command set
+- **Two themes** — Cosmos and Liquid Glass
 
-Useful commands:
+## Keyboard
 
-```sh
-bash scripts/bootstrap.sh setup       # prepare only
-bash scripts/bootstrap.sh doctor      # check runtime dependencies
-bash scripts/bootstrap.sh typecheck
-bash scripts/bootstrap.sh test
-bash scripts/bootstrap.sh ci          # typecheck + tests + production build
-bash scripts/bootstrap.sh dist        # build Linux packages
-bash scripts/bootstrap.sh clean       # keep the private Node download
-bash scripts/bootstrap.sh purge       # remove all generated files and private Node
-```
+- Ctrl + `P` — quick open file
+- Ctrl + `F` — find in editor / search workspace
+- Ctrl + Shift + `F` — search across the project
+- Ctrl + Shift + `P` — command palette
+- Ctrl + `B` — pin/auto-hide Explorer
+- Ctrl + `` ` `` — terminal
 
-If Git, Python 3, make, or a C++ compiler is missing, the script prints the exact distro command and can install it after confirmation. For a non-interactive one-shot setup on pacman/apt/dnf/zypper/apk systems:
+Full walkthrough: [docs/USERGUIDE.md](docs/USERGUIDE.md).
 
-```sh
-bash scripts/bootstrap.sh dev --install-system-deps
-```
+## Screenshots
 
-To repair a partial installation:
+**Start** — directory picker with recent folders and keyboard navigation. Luma is an IDE first: any folder opens, Git is optional.
+![Start screen](docs/screenshots/login.png)
 
-```sh
-bash scripts/bootstrap.sh setup --force
-```
+**Setup** — per-repository settings, including theme choice.
+![Setup](docs/screenshots/setup.png)
 
-Advanced contributors can deliberately use an existing compatible Node by setting `LUMA_USE_SYSTEM_NODE=1`; the script refuses an incompatible version instead of producing a late Electron error.
+**Code** — the editor with tabs, file explorer, status line and syntax highlighting.
+![Code](docs/screenshots/code.png)
 
-### Production package
+**Changes** — unstaged/staged files, drag & drop staging, diff view and commit box.
+![Changes](docs/screenshots/changes.png)
 
-```sh
-bash scripts/bootstrap.sh ci
-bash scripts/bootstrap.sh dist
-```
+**History — Lanes** — the classic commit graph with branch lanes, commit details and actions.
+![History lanes](docs/screenshots/history_lanes.png)
 
-Packages are written to `dist/`.
+**History — Orbit** — the same history as an interactive 3D constellation: recent commits in the center, older ones further away; drag to rotate, wheel to zoom.
+![History orbit](docs/screenshots/history_orbit.png)
 
-## First-run safety model
+**GitHub** — connect a token or SSH key, then clone, fetch, pull and push without leaving the app.
+![GitHub](docs/screenshots/GitHub.png)
 
-Opening a repository does not automatically trust its code. Until **Trust repository** is selected in Intelligence Center, Luma blocks repository Tasks and the integrated terminal. Trust does not make unknown code safe: Git hooks and commands can still have side effects, so inspect unfamiliar repositories before executing operations.
+**Tools** — bisect, stash, reflog Rescue and other recovery operations in one place.
+![Tools](docs/screenshots/Tools.png)
 
-Every soft/hard rollback creates a checkpoint branch. Undo can still alter the working tree; Luma checks for local modifications before restoring and offers to stash them.
+**Stack (Languages & Ecosystem)** — detected runtimes, project dependencies and one-click installs of packages and frameworks.
+![Stack](docs/screenshots/stack.png)
 
-## GitHub credentials
-
-For HTTPS access, use a **fine-grained personal access token** limited to only the repositories and permissions needed. Luma encrypts it with Electron `safeStorage`, stores the encrypted file with mode `0600`, and passes the decrypted value only to authenticated child Git processes through `GIT_ASKPASS`. You can sign out from the GitHub panel at any time. Existing SSH keys can be used instead. OAuth Device Flow is planned but is not part of 0.1.
-
-Never paste a token into an issue, screenshot, terminal recording, or chat.
-
-## Keyboard and Orbit
-
-- Orbit: drag rotates left/right and tilts up/down, Shift-drag or right-drag pans, wheel zooms, `Fit` resets the view
-- Ctrl/Cmd + `P`: quick open file
-- Ctrl/Cmd + `F`: find in file (editor) / search workspace
-- Ctrl/Cmd + Shift + `F`: search text across the project
-- Ctrl/Cmd + Shift + `P`: command palette
-- Ctrl/Cmd + `B`: pin/auto-hide Explorer
-- Ctrl/Cmd + `` ` ``: terminal
-
-A full walkthrough of every section lives in [docs/USERGUIDE.md](docs/USERGUIDE.md).
+**Rescue** — reflog browser: every move of HEAD is recoverable, with checkpoint branches from rollbacks.
+![Rescue](docs/screenshots/rescue.png)
 
 ## Project structure
 
