@@ -33,6 +33,6 @@ pkgbase = luma-bin
 	options = !strip
 	options = !debug
 	source_x86_64 = https://github.com/drainedgodw/Luma/releases/download/v0.1.0/Luma-0.1.0.AppImage
-	sha256sums_x86_64 = e32da38d0b4a4b500a71966a54422dd6e1c4d54dd0cdbe1770aa16e96ab4ecb2
+	sha256sums_x86_64 = a927498f62eca9a0e0754e99e27e02e6189bbccf45e04d3f11637b5982db6f52
 
 pkgname = luma-bin
