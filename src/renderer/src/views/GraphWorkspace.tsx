@@ -16,7 +16,15 @@ type Preview = {
   conflicts?: boolean;
 };
 type LaidCommit = ReturnType<typeof layoutGraph>[number];
-type OrbitNode = { commit: LaidCommit; x: number; y: number; z: number };
+type OrbitNode = {
+  commit: LaidCommit;
+  x: number;
+  y: number;
+  z: number;
+  gen: number;
+  ordinal: number;
+  root: boolean;
+};
 type OrbitCamera = { yaw: number; pitch: number; zoom: number; panX: number; panY: number };
 const ROW = 62;
 const TOP = 26;
@@ -225,12 +233,42 @@ export default function GraphWorkspace({ onRebase }: { onRebase?: (branch: strin
     </div>
   );
 }
-function dotColor(commit: LaidCommit, risk?: Risk) {
-  return risk?.test === 'fail'
-    ? '#fb7185'
-    : risk?.test === 'pass'
-      ? '#4fd1c5'
-      : COLORS[commit.lane % COLORS.length];
+function categoryColor(
+  commit: LaidCommit,
+  risk: Record<string, Risk>,
+  isFirst: boolean,
+  isHead: boolean
+) {
+  if (isFirst) return { color: '#f6e05e', label: 'first commit' };
+  if (isHead) return { color: '#63b3ed', label: 'HEAD / latest' };
+  if (commit.parents.length > 1) return { color: '#a78bfa', label: 'merge' };
+  const item = risk[commit.hash];
+  if (item?.test === 'fail') return { color: '#fb7185', label: 'tests failed' };
+  if (item?.test === 'pass') return { color: '#4fd1c5', label: 'tests pass' };
+  return { color: COLORS[commit.lane % COLORS.length], label: 'regular' };
+}
+const LEGEND = [
+  ['#f6e05e', 'first commit'],
+  ['#63b3ed', 'HEAD / latest'],
+  ['#a78bfa', 'merge'],
+  ['#fb7185', 'tests failed'],
+  ['#4fd1c5', 'tests pass'],
+  ['#c4b5fd', 'regular branch'],
+] as const;
+function ColorLegend() {
+  return (
+    <div className="pointer-events-none absolute bottom-3 right-3 z-10 rounded-lg border border-white/10 bg-black/40 px-2.5 py-2 text-[9px] text-white/50">
+      {LEGEND.map(([color, label]) => (
+        <div key={label} className="flex items-center gap-1.5 leading-4">
+          <span
+            className="inline-block h-2 w-2 rounded-full"
+            style={{ backgroundColor: color }}
+          />
+          {label}
+        </div>
+      ))}
+    </div>
+  );
 }
 function radius(base: number, risk?: Risk) {
   return risk ? Math.min(17, base + risk.score * 0.07) : base;
@@ -249,6 +287,9 @@ function Lanes({
   const rows = new Map(commits.map((commit, index) => [commit.hash, index]));
   const width = 44 + (Math.max(0, ...commits.map((commit) => commit.lane)) + 1) * LANE;
   const height = Math.max(400, commits.length * ROW + TOP * 2);
+  const isRoot = (commit: LaidCommit) =>
+    !commit.parents.some((parent) => rows.has(parent));
+  const isHead = (commit: LaidCommit) => commit.refs.some((ref) => ref.includes('HEAD'));
   return (
     <div className="relative min-w-[650px]" style={{ height }}>
       <svg className="absolute inset-0" width={width} height={height}>
@@ -277,13 +318,20 @@ function Lanes({
           const item = risk[commit.hash];
           const x = 28 + commit.lane * LANE;
           const y = TOP + index * ROW + ROW / 2;
+          const cat = categoryColor(commit, risk, isRoot(commit), isHead(commit));
           return (
             <g key={commit.hash}>
+              {isHead(commit) && (
+                <circle cx={x} cy={y} r={radius(active ? 10 : 7, item) + 5} fill="none" stroke="#63b3ed" strokeWidth="1.5" opacity=".6" />
+              )}
+              {isRoot(commit) && (
+                <circle cx={x} cy={y} r={radius(active ? 10 : 7, item) + 5} fill="none" stroke="#f6e05e" strokeWidth="1.5" opacity=".6" />
+              )}
               <circle
                 cx={x}
                 cy={y}
                 r={radius(active ? 10 : 7, item)}
-                fill={dotColor(commit, item)}
+                fill={cat.color}
                 stroke={active ? '#fff' : 'transparent'}
                 strokeWidth="3"
               />
@@ -301,7 +349,7 @@ function Lanes({
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[13px] text-white/85">{commit.message}</span>
             <span className="block text-[11px] text-white/45">
-              {commit.shortHash} · {commit.author}
+              #{commits.length - index} · {commit.shortHash} · {commit.author}
             </span>
           </span>
           {commit.refs.length > 0 && (
@@ -352,18 +400,55 @@ function Orbit({
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  // Commits live in 3D: a spiral galaxy where depth (z) is recency, newest at the center.
+  // Commits live in 3D: each git generation forms a ring around the root, so
+  // parent links always point inwards and it's clear what follows what.
   const nodes = useMemo<OrbitNode[]>(() => {
     const span = Math.min(size.width, size.height);
-    return commits.slice(0, 400).map((commit, index, source) => {
-      if (index === 0) return { commit, x: 0, y: 0, z: 0 };
-      const progress = source.length > 1 ? index / (source.length - 1) : 0;
-      const angle = index * 2.39996;
-      const r = 60 + progress * span * 0.42;
-      return { commit, x: Math.cos(angle) * r, y: Math.sin(angle) * r, z: progress * span * 0.55 };
+    const list = commits.slice(0, 400);
+    const seen = new Set(list.map((commit) => commit.hash));
+    const generation = new Map<string, number>();
+    for (const commit of list.slice().reverse()) {
+      let gen = 0;
+      for (const parent of commit.parents) {
+        const parentGen = generation.get(parent);
+        if (parentGen !== undefined) gen = Math.max(gen, parentGen + 1);
+      }
+      generation.set(commit.hash, gen);
+    }
+    const rings = new Map<number, LaidCommit[]>();
+    for (const commit of list) {
+      const gen = generation.get(commit.hash) ?? 0;
+      const ring = rings.get(gen) ?? [];
+      ring.push(commit);
+      rings.set(gen, ring);
+    }
+    const maxGen = Math.max(1, ...rings.keys());
+    const placed = new Map<string, { x: number; y: number }>();
+    for (const [gen, ring] of rings) {
+      const radius = gen === 0 ? (ring.length > 1 ? 26 : 0) : 46 + (gen / maxGen) * span * 0.44;
+      ring.forEach((commit, i) => {
+        const angle = (i / ring.length) * Math.PI * 2 + gen * 0.7;
+        placed.set(commit.hash, { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+      });
+    }
+    return list.map((commit, index) => {
+      const position = placed.get(commit.hash) ?? { x: 0, y: 0 };
+      const gen = generation.get(commit.hash) ?? 0;
+      return {
+        commit,
+        x: position.x,
+        y: position.y,
+        z: (gen / maxGen) * span * 0.5,
+        gen,
+        ordinal: list.length - index,
+        root: !commit.parents.some((parent) => seen.has(parent)),
+      };
     });
   }, [commits, size]);
-  const byHash = useMemo(() => new Map(nodes.map((node) => [node.commit.hash, node])), [nodes]);
+  const meta = useMemo(
+    () => new Map(nodes.map((node) => [node.commit.hash, node])),
+    [nodes]
+  );
   const perspective = useMemo(() => {
     const cosY = Math.cos(camera.yaw);
     const sinY = Math.sin(camera.yaw);
@@ -526,6 +611,9 @@ function Orbit({
           .map((item) => {
             const active = selected?.hash === item.commit.hash;
             const item2 = risk[item.commit.hash];
+            const node = meta.get(item.commit.hash);
+            const isHead = item.commit.refs.some((ref) => ref.includes('HEAD'));
+            const cat = categoryColor(item.commit, risk, node?.root ?? false, isHead);
             const nodeRadius = radius(active ? 12 : 7, item2) * item.point.depth * camera.zoom;
             const near = item.point.depth;
             return (
@@ -551,11 +639,33 @@ function Orbit({
                   cx={item.point.x}
                   cy={item.point.y}
                   r={Math.max(1.6, nodeRadius)}
-                  fill={dotColor(item.commit, item2)}
+                  fill={cat.color}
                   opacity={0.35 + near * 0.65}
                   stroke={active ? '#fff' : 'transparent'}
                   strokeWidth={Math.max(0.6, 2.5 * near)}
                 />
+                {node?.root && (
+                  <circle
+                    cx={item.point.x}
+                    cy={item.point.y}
+                    r={Math.max(2.4, nodeRadius + 5)}
+                    fill="none"
+                    stroke="#f6e05e"
+                    strokeWidth={Math.max(0.8, 1.6 * near)}
+                    opacity=".7"
+                  />
+                )}
+                {isHead && (
+                  <circle
+                    cx={item.point.x}
+                    cy={item.point.y}
+                    r={Math.max(2.4, nodeRadius + 8)}
+                    fill="none"
+                    stroke="#63b3ed"
+                    strokeWidth={Math.max(0.8, 1.6 * near)}
+                    opacity=".6"
+                  />
+                )}
                 {(active || near > 0.85) && (
                   <text
                     x={item.point.x}
@@ -566,7 +676,20 @@ function Orbit({
                       active ? 'rgba(255,255,255,.92)' : `rgba(255,255,255,${(near - 0.5) * 1.2})`
                     }
                   >
+                    {node ? `#${node.ordinal} ` : ''}
                     {item.commit.shortHash}
+                  </text>
+                )}
+                {node?.root && near > 0.7 && (
+                  <text
+                    x={item.point.x}
+                    y={item.point.y - nodeRadius - 18}
+                    textAnchor="middle"
+                    fontSize="8"
+                    fill="#f6e05e"
+                    opacity=".85"
+                  >
+                    first
                   </text>
                 )}
                 {item.commit.refs.length > 0 && (
@@ -587,15 +710,23 @@ function Orbit({
       {hovered && selected?.hash !== hovered.hash && (
         <div className="pointer-events-none absolute bottom-4 left-4 max-w-sm rounded-xl border border-lilac/25 bg-[#0b1020]/95 p-3 shadow-2xl">
           <div className="truncate text-xs text-white/85">{hovered.message}</div>
-          <div className="mt-1 font-mono text-[10px] text-lilac">{hovered.shortHash}</div>
+          <div className="mt-1 font-mono text-[10px] text-lilac">
+            #{meta.get(hovered.hash)?.ordinal ?? '—'} · {hovered.shortHash}
+          </div>
           <div className="mt-1 text-[10px] text-white/40">
             {hovered.author} · {new Date(hovered.timestamp * 1000).toLocaleString()}
           </div>
+          {hovered.parents.length > 0 && (
+            <div className="mt-1 text-[9px] text-white/35">
+              after {hovered.parents.map((parent) => parent.slice(0, 7)).join(', ')}
+            </div>
+          )}
           <div className="mt-2 text-[9px] text-white/25">
             Click for diff and the same actions as Lanes
           </div>
         </div>
       )}
+      <ColorLegend />
     </div>
   );
 }
