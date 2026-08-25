@@ -46,7 +46,9 @@ const suggestionField = StateField.define<Suggestion | null>({
 const ghostDecoration = EditorView.decorations.compute([suggestionField], (state) => {
   const s = state.field(suggestionField);
   if (!s || s.pos !== state.selection.main.head) return Decoration.none;
-  return Decoration.set([Decoration.widget({ widget: new GhostWidget(s.text), side: 1 }).range(s.pos)]);
+  return Decoration.set([
+    Decoration.widget({ widget: new GhostWidget(s.text), side: 1 }).range(s.pos),
+  ]);
 });
 
 const identifierChars = /[A-Za-z0-9_$]/;
@@ -73,7 +75,8 @@ function computeSuggestion(view: EditorView, keywords: string[]): Suggestion | n
   const doc = state.doc.sliceString(0, Math.min(state.doc.length, 200_000));
   const seen = new Set<string>();
   for (const kw of keywords) {
-    if (kw.toLowerCase().startsWith(prefix.toLowerCase()) && kw.length > prefix.length) seen.add(kw);
+    if (kw.toLowerCase().startsWith(prefix.toLowerCase()) && kw.length > prefix.length)
+      seen.add(kw);
   }
   const wordRe = /[A-Za-z_$][A-Za-z0-9_$]{2,}/g;
   let m: RegExpExecArray | null;
@@ -133,7 +136,7 @@ export function inlineSuggestion(keywords: string[], enabled: () => boolean) {
             return false;
           },
         },
-      ]),
+      ])
     ),
   ];
 }

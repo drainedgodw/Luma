@@ -8,10 +8,12 @@ export default function RescueView() {
   const [entries, setEntries] = useState<ReflogEntry[] | null>(null);
   const [confirm, setConfirm] = useState<ReflogEntry | null>(null);
   const load = useCallback(() => {
-    gitCall<ReflogEntry[]>('reflog').then(setEntries).catch((error) => {
-      setToast((error as Error).message);
-      setEntries([]);
-    });
+    gitCall<ReflogEntry[]>('reflog')
+      .then(setEntries)
+      .catch((error) => {
+        setToast((error as Error).message);
+        setEntries([]);
+      });
   }, [setToast]);
 
   useEffect(load, [load]);
@@ -29,7 +31,7 @@ export default function RescueView() {
       setToast(
         mode === 'hard' && safetyBranch
           ? `Jumped back to ${entry.selector}; backup branch: ${safetyBranch}`
-          : `Jumped back to ${entry.selector} (${mode})`,
+          : `Jumped back to ${entry.selector} (${mode})`
       );
     } catch (error) {
       setToast((error as Error).message);
@@ -41,19 +43,35 @@ export default function RescueView() {
     <div className="glass flex h-full min-h-0 flex-col overflow-hidden">
       <div className="flex items-center gap-3 border-b border-white/8 px-5 py-3">
         <span className="text-[11px] uppercase tracking-wider text-white/40">Rescue</span>
-        <span className="text-[11px] text-white/25">every move HEAD ever made — jump back to any moment</span>
+        <span className="text-[11px] text-white/25">
+          every move HEAD ever made — jump back to any moment
+        </span>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4" data-smooth-scroll="always">
         {entries === null && <div className="p-3 text-xs text-white/40">Loading…</div>}
         <div className="mx-auto flex max-w-3xl flex-col gap-1.5">
           {entries?.map((entry, index) => (
-            <div key={`${entry.selector}-${index}`} className="rescue-row glass-soft group flex items-center gap-3 px-4 py-2.5">
-              <span className={`h-2 w-2 shrink-0 rounded-full ${index === 0 ? 'bg-teal shadow-[0_0_8px_#4fd1c5]' : 'bg-white/20'}`} />
+            <div
+              key={`${entry.selector}-${index}`}
+              className="rescue-row glass-soft group flex items-center gap-3 px-4 py-2.5"
+            >
+              <span
+                className={`h-2 w-2 shrink-0 rounded-full ${index === 0 ? 'bg-teal shadow-[0_0_8px_#4fd1c5]' : 'bg-white/20'}`}
+              />
               <div className="min-w-0 flex-1">
                 <div className="truncate text-[13px] text-white/80">{entry.summary}</div>
-                <div className="font-mono text-[10px] text-white/30">{entry.selector} · {entry.shortHash}</div>
+                <div className="font-mono text-[10px] text-white/30">
+                  {entry.selector} · {entry.shortHash}
+                </div>
               </div>
-              {index > 0 && <button className="btn px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100" onClick={() => setConfirm(entry)}>Jump back</button>}
+              {index > 0 && (
+                <button
+                  className="btn px-2 py-1 text-[10px] opacity-0 group-hover:opacity-100"
+                  onClick={() => setConfirm(entry)}
+                >
+                  Jump back
+                </button>
+              )}
               {index === 0 && <span className="text-[10px] text-teal">now</span>}
             </div>
           ))}
@@ -63,12 +81,24 @@ export default function RescueView() {
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="glass anim-in w-[440px] p-5">
             <div className="mb-2 text-sm font-semibold text-amber">Jump back to this moment?</div>
-            <div className="mb-1 text-xs text-white/60">Move HEAD to <span className="font-mono text-amber">{confirm.selector}</span> — “{confirm.summary}”</div>
-            <div className="mb-4 text-[11px] text-white/35">Soft keeps later changes staged. Hard resets the branch, but Luma first creates a luma-rescue-* safety branch so the current state can still be recovered.</div>
+            <div className="mb-1 text-xs text-white/60">
+              Move HEAD to <span className="font-mono text-amber">{confirm.selector}</span> — “
+              {confirm.summary}”
+            </div>
+            <div className="mb-4 text-[11px] text-white/35">
+              Soft keeps later changes staged. Hard resets the branch, but Luma first creates a
+              luma-rescue-* safety branch so the current state can still be recovered.
+            </div>
             <div className="flex justify-end gap-2">
-              <button className="btn text-xs" onClick={() => setConfirm(null)}>Cancel</button>
-              <button className="btn text-xs" onClick={() => rewind(confirm, 'soft')}>Jump back · soft</button>
-              <button className="btn btn-danger text-xs" onClick={() => rewind(confirm, 'hard')}>Jump back · hard + backup</button>
+              <button className="btn text-xs" onClick={() => setConfirm(null)}>
+                Cancel
+              </button>
+              <button className="btn text-xs" onClick={() => rewind(confirm, 'soft')}>
+                Jump back · soft
+              </button>
+              <button className="btn btn-danger text-xs" onClick={() => rewind(confirm, 'hard')}>
+                Jump back · hard + backup
+              </button>
             </div>
           </div>
         </div>

@@ -11,9 +11,72 @@ contextBridge.exposeInMainWorld('luma', {
   workspaceSearch: (q: string) => ipcRenderer.invoke('workspace:search', q),
   workspaceTechnology: () => ipcRenderer.invoke('workspace:technology'),
   workspaceInitGit: () => ipcRenderer.invoke('workspace:initGit'),
-  gitInvoke: (channel: string, ...args: unknown[]) => channel === 'commit' ? ipcRenderer.invoke('intel:git:commit', ...args) : channel === 'rewindSoft' ? ipcRenderer.invoke('intel:git:rewind', 'soft', ...args) : channel === 'rewindHard' ? ipcRenderer.invoke('intel:git:rewind', 'hard', ...args) : ipcRenderer.invoke(SECURE_GIT_CHANNELS.has(channel) ? `github:git:${channel}` : `git:${channel}`, ...args),
-  fsRead: (p: string) => ipcRenderer.invoke('fs:read', p), fsWrite: (p: string, c: string) => ipcRenderer.invoke('fs:write', p, c), historyList: (p: string) => ipcRenderer.invoke('history:list', p), historyGet: (p: string, t: number) => ipcRenderer.invoke('history:get', p, t), fsList: (p: string) => ipcRenderer.invoke('fs:list', p), fsNewFile: (p: string, n: string) => ipcRenderer.invoke('fs:newFile', p, n), fsNewDir: (p: string, n: string) => ipcRenderer.invoke('fs:newDir', p, n), fsRename: (p: string, n: string) => ipcRenderer.invoke('fs:rename', p, n), fsDelete: (p: string, d: boolean) => ipcRenderer.invoke('fs:delete', p, d), fsDuplicate: (p: string) => ipcRenderer.invoke('fs:duplicate', p),
-  githubStatus: () => ipcRenderer.invoke('github:status'), githubSaveToken: (t: string) => ipcRenderer.invoke('github:saveToken', t), githubLogout: () => ipcRenderer.invoke('github:logout'), githubRepos: (q?: string) => ipcRenderer.invoke('github:repos', q), githubClone: (r: unknown, t: 'https' | 'ssh') => ipcRenderer.invoke('github:clone', r, t), intelInvoke: (m: string, ...a: unknown[]) => ipcRenderer.invoke('intel:invoke', m, ...a), onCommand: (cb: (e: { id: number; command: string; at: number }) => void) => ipcRenderer.on('git:command', (_e, x) => cb(x)),
-  winMin: () => ipcRenderer.send('win:min'), winMax: () => ipcRenderer.send('win:max'), winClose: () => ipcRenderer.send('win:close'), wallpaper: () => ipcRenderer.invoke('wallpaper:get'), openExternal: (u: string) => ipcRenderer.invoke('shell:openExternal', u), termCreate: (id: string) => ipcRenderer.send('term:create', id), termWrite: (id: string, d: string) => ipcRenderer.send('term:write', id, d), termResize: (id: string, c: number, r: number) => ipcRenderer.send('term:resize', id, c, r), termKill: (id: string) => ipcRenderer.send('term:kill', id), termOnData: (id: string, cb: (d: string) => void) => ipcRenderer.on(`term:data:${id}`, (_e, d) => cb(d)), termOnExit: (id: string, cb: () => void) => ipcRenderer.on(`term:exit:${id}`, () => cb()), termOff: (id: string) => { ipcRenderer.removeAllListeners(`term:data:${id}`); ipcRenderer.removeAllListeners(`term:exit:${id}`); },
+  gitInvoke: (channel: string, ...args: unknown[]) =>
+    channel === 'commit'
+      ? ipcRenderer.invoke('intel:git:commit', ...args)
+      : channel === 'rewindSoft'
+        ? ipcRenderer.invoke('intel:git:rewind', 'soft', ...args)
+        : channel === 'rewindHard'
+          ? ipcRenderer.invoke('intel:git:rewind', 'hard', ...args)
+          : ipcRenderer.invoke(
+              SECURE_GIT_CHANNELS.has(channel) ? `github:git:${channel}` : `git:${channel}`,
+              ...args
+            ),
+  fsRead: (p: string) => ipcRenderer.invoke('fs:read', p),
+  fsWrite: (p: string, c: string) => ipcRenderer.invoke('fs:write', p, c),
+  historyList: (p: string) => ipcRenderer.invoke('history:list', p),
+  historyGet: (p: string, t: number) => ipcRenderer.invoke('history:get', p, t),
+  fsList: (p: string) => ipcRenderer.invoke('fs:list', p),
+  fsNewFile: (p: string, n: string) => ipcRenderer.invoke('fs:newFile', p, n),
+  fsNewDir: (p: string, n: string) => ipcRenderer.invoke('fs:newDir', p, n),
+  fsRename: (p: string, n: string) => ipcRenderer.invoke('fs:rename', p, n),
+  fsDelete: (p: string, d: boolean) => ipcRenderer.invoke('fs:delete', p, d),
+  fsDuplicate: (p: string) => ipcRenderer.invoke('fs:duplicate', p),
+  githubStatus: () => ipcRenderer.invoke('github:status'),
+  githubSaveToken: (t: string) => ipcRenderer.invoke('github:saveToken', t),
+  githubLogout: () => ipcRenderer.invoke('github:logout'),
+  githubRepos: (q?: string) => ipcRenderer.invoke('github:repos', q),
+  githubClone: (r: unknown, t: 'https' | 'ssh') => ipcRenderer.invoke('github:clone', r, t),
+  intelInvoke: (m: string, ...a: unknown[]) => ipcRenderer.invoke('intel:invoke', m, ...a),
+  onCommand: (cb: (e: { id: number; command: string; at: number }) => void) =>
+    ipcRenderer.on('git:command', (_e, x) => cb(x)),
+  winMin: () => ipcRenderer.send('win:min'),
+  winMax: () => ipcRenderer.send('win:max'),
+  winClose: () => ipcRenderer.send('win:close'),
+  wallpaper: () => ipcRenderer.invoke('wallpaper:get'),
+  openExternal: (u: string) => ipcRenderer.invoke('shell:openExternal', u),
+  termCreate: (id: string) => ipcRenderer.send('term:create', id),
+  termWrite: (id: string, d: string) => ipcRenderer.send('term:write', id, d),
+  termResize: (id: string, c: number, r: number) => ipcRenderer.send('term:resize', id, c, r),
+  termKill: (id: string) => ipcRenderer.send('term:kill', id),
+  termOnData: (id: string, cb: (d: string) => void) =>
+    ipcRenderer.on(`term:data:${id}`, (_e, d) => cb(d)),
+  termOnExit: (id: string, cb: () => void) => ipcRenderer.on(`term:exit:${id}`, () => cb()),
+  termOff: (id: string) => {
+    ipcRenderer.removeAllListeners(`term:data:${id}`);
+    ipcRenderer.removeAllListeners(`term:exit:${id}`);
+  },
 });
-export type LumaApi = { openRepoDialog(): Promise<unknown>; openRepoPath(p: string): Promise<unknown>; repoPath(): Promise<string | null>; recentRepos(): Promise<string[]>; closeWorkspace(): Promise<unknown>; workspaceInfo(): Promise<unknown>; workspaceFiles(): Promise<unknown>; workspaceSearch(q: string): Promise<unknown>; workspaceTechnology(): Promise<unknown>; workspaceInitGit(): Promise<unknown>; gitInvoke(c: string, ...a: unknown[]): Promise<unknown>; fsRead(p: string): Promise<unknown>; fsWrite(p: string, c: string): Promise<unknown>; fsList(p: string): Promise<unknown>; githubStatus(): Promise<unknown>; githubSaveToken(t: string): Promise<unknown>; githubLogout(): Promise<unknown>; githubRepos(q?: string): Promise<unknown>; githubClone(r: unknown, t: 'https' | 'ssh'): Promise<unknown>; intelInvoke(m: string, ...a: unknown[]): Promise<unknown>; onCommand(cb: (e: { id: number; command: string; at: number }) => void): void; };
+export type LumaApi = {
+  openRepoDialog(): Promise<unknown>;
+  openRepoPath(p: string): Promise<unknown>;
+  repoPath(): Promise<string | null>;
+  recentRepos(): Promise<string[]>;
+  closeWorkspace(): Promise<unknown>;
+  workspaceInfo(): Promise<unknown>;
+  workspaceFiles(): Promise<unknown>;
+  workspaceSearch(q: string): Promise<unknown>;
+  workspaceTechnology(): Promise<unknown>;
+  workspaceInitGit(): Promise<unknown>;
+  gitInvoke(c: string, ...a: unknown[]): Promise<unknown>;
+  fsRead(p: string): Promise<unknown>;
+  fsWrite(p: string, c: string): Promise<unknown>;
+  fsList(p: string): Promise<unknown>;
+  githubStatus(): Promise<unknown>;
+  githubSaveToken(t: string): Promise<unknown>;
+  githubLogout(): Promise<unknown>;
+  githubRepos(q?: string): Promise<unknown>;
+  githubClone(r: unknown, t: 'https' | 'ssh'): Promise<unknown>;
+  intelInvoke(m: string, ...a: unknown[]): Promise<unknown>;
+  onCommand(cb: (e: { id: number; command: string; at: number }) => void): void;
+};

@@ -1,6 +1,331 @@
-import { useCallback,useEffect,useState } from 'react';import{api}from'../lib/api';import{useStore}from'../store';import{useWorkspace}from'../workspace';
-type Task={id:string;label:string;command:string;args:string[]};type Match={path:string;row:number;text:string};type Capsule={id:string;name:string;branch?:string;tabs:string[];active?:string|null;terminalOpen:boolean;note:string;at:number};
-export default function IntelligenceView(){const{status,isGitRepo,initializeGit,setToast,refresh}=useStore(),{tabs,active,openFile}=useWorkspace();const[trusted,setTrusted]=useState(false),[tasks,setTasks]=useState<Task[]>([]),[output,setOutput]=useState(''),[operation,setOperation]=useState<'merge'|'rebase'|'reset'>('merge'),[ref,setRef]=useState('main'),[symbol,setSymbol]=useState(''),[replacement,setReplacement]=useState(''),[matches,setMatches]=useState<Match[]>([]),[note,setNote]=useState(''),[capsules,setCapsules]=useState<Capsule[]>([]);
-async function call<T>(method:string,...args:unknown[]):Promise<T>{const result=await api.intelInvoke(method,...args);if(!result.ok)throw new Error(result.error?.message??'Workspace operation failed');return result.data as T}const reload=useCallback(()=>{void call<boolean>('trustStatus').then(setTrusted).catch(()=>setTrusted(false));void call<Task[]>('tasks').then(setTasks).catch(()=>setTasks([]));void call<Capsule[]>('capsules').then(setCapsules).catch(()=>setCapsules([]));},[]);useEffect(reload,[reload]);async function run(fn:()=>Promise<void>){try{await fn()}catch(error){setToast((error as Error).message)}}
-async function basicCheck(){if(!active){setOutput('Open a file first.');return}const result=await api.fsRead(active);if(!result.ok){setOutput(result.error?.message??'Read failed');return}const text=result.data??'',issues:string[]=[];if(active.endsWith('.json'))try{JSON.parse(text)}catch(error){issues.push(`JSON: ${(error as Error).message}`)}const pairs:Record<string,string>={'(':')','[':']','{':'}'},stack:string[]=[];for(const char of text){if(pairs[char])stack.push(pairs[char]);else if(Object.values(pairs).includes(char)&&stack.pop()!==char){issues.push(`Possible unbalanced delimiter: ${char}`);break}}if(stack.length)issues.push(`Possible missing delimiter: ${stack.at(-1)}`);text.split('\n').forEach((line,index)=>{if(/TODO|FIXME/.test(line))issues.push(`${index+1}: TODO/FIXME`)});setOutput(issues.length?`Basic checks · ${active}\n${issues.join('\n')}`:`Basic checks · ${active}\nNo issues found by the limited delimiter/JSON checker.`)}
-return <div className="glass h-full overflow-y-auto p-5"><div className="mx-auto flex max-w-4xl flex-col gap-5"><header><div className="text-sm font-semibold">Luma Workspace Tools</div><div className="text-xs text-white/35">Trust · project tasks · code search · workspace snapshots{isGitRepo?' · Git previews':''}</div></header><section className="glass-soft p-4"><div className="flex items-center justify-between gap-4"><div><b>Workspace Trust</b><div className="text-xs text-white/35">Tasks and the integrated terminal stay disabled until this folder is trusted.</div></div><div className="flex gap-2">{isGitRepo&&<button className="btn text-teal" onClick={()=>run(async()=>{const result=await call<{ref:string;safety:string;stashed:boolean}>('undoRollback');await refresh();setToast(`Restored ${result.ref}`)})}>Undo last rollback</button>}<button className={`btn ${trusted?'text-teal':'text-amber'}`} onClick={()=>run(async()=>setTrusted(await call('setTrust',!trusted)))}>{trusted?'Trusted ✓':'Trust workspace'}</button></div></div></section><section className="glass-soft p-4"><b>Tasks / Local Test Center</b><div className="mt-1 text-xs text-white/35">Detected tasks work in folders with or without Git.</div><div className="mt-3 flex flex-wrap gap-2">{tasks.map(task=><button className="btn text-xs" key={task.id} disabled={!trusted} onClick={()=>run(async()=>{setOutput('Running…');const result=await call<{ok:boolean;output:string;sha:string}>('runTask',task);setOutput(`${result.ok?'PASS':'FAIL'} · ${result.sha.slice(0,24)}\n${result.output}`)})}>{task.label}</button>)}{!tasks.length&&<span className="text-xs text-white/30">No runnable project tasks detected.</span>}</div>{output&&<pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-xl bg-black/25 p-3 text-[11px] text-white/60">{output}</pre>}</section>{isGitRepo?<section className="glass-soft p-4"><b>Git Operation Preview <span className="text-[10px] font-normal text-amber">EXPERIMENTAL</span></b><div className="mt-3 flex gap-2"><select className="field" value={operation} onChange={event=>setOperation(event.target.value as typeof operation)}><option value="merge">Merge</option><option value="rebase">Rebase</option><option value="reset">Reset</option></select><input className="field flex-1" value={ref} onChange={event=>setRef(event.target.value)}/><button className="btn" onClick={()=>run(async()=>{const result=await call<{summary:string;conflicts?:boolean}>('preview',operation,ref);setOutput(`${result.conflicts?'POSSIBLE CONFLICTS':'READ-ONLY PREVIEW'}\n${result.summary}`)})}>Preview only</button></div></section>:<section className="glass-soft flex items-center gap-4 p-4"><div className="min-w-0 flex-1"><b>Git is optional</b><div className="mt-1 text-xs text-white/35">Keep editing normally, or initialize Git when you want History, Changes and Rescue.</div></div><button className="btn text-teal" onClick={()=>void initializeGit()}>Initialize Git</button></section>}<section className="glass-soft p-4"><b>Code tools <span className="text-[10px] font-normal text-amber">PROTOTYPE</span></b><div className="mt-3 flex flex-wrap gap-2"><button className="btn" onClick={basicCheck}>Basic check active file</button><input className="field min-w-32 flex-1" value={symbol} onChange={event=>setSymbol(event.target.value)} placeholder="symbol text"/><button className="btn" disabled={!symbol.trim()} onClick={()=>run(async()=>setMatches(await call('symbols',symbol)))}>Find symbol</button><input className="field min-w-32 flex-1" value={replacement} onChange={event=>setReplacement(event.target.value)} placeholder="replace with"/><button className="btn text-amber" disabled={!trusted||!matches.length||!replacement} onClick={()=>run(async()=>{if(!window.confirm(`Replace ${matches.length} match(es)?`))return;const result=await call<{files:number}>('rename',symbol,replacement);setToast(`Text replaced in ${result.files} files`)})}>Text replace</button></div><div className="mt-2 max-h-40 overflow-auto">{matches.map((match,index)=><button key={`${match.path}:${match.row}:${index}`} className="block w-full truncate rounded px-2 py-1 text-left font-mono text-[11px] hover:bg-white/5" onClick={()=>{openFile(match.path);window.dispatchEvent(new CustomEvent('luma:reveal-line',{detail:{path:match.path,line:match.row}}))}}>{match.path}:{match.row} · {match.text}</button>)}</div></section><section className="glass-soft p-4"><b>Workspace snapshots</b><textarea className="field mt-2 h-16 w-full" value={note} onChange={event=>setNote(event.target.value)} placeholder="What are you working on?"/><button className="btn btn-primary mt-2" onClick={()=>run(async()=>{await call('saveCapsule',{name:note.slice(0,40)||`Workspace ${new Date().toLocaleString()}`,branch:status?.branch,tabs:tabs.map(tab=>tab.path),active,terminalOpen:localStorage.getItem('luma.terminalOpen')==='1',note});setNote('');reload()})}>Save workspace snapshot</button><div className="mt-3 grid gap-2">{capsules.map(capsule=><button className="rounded-xl border border-white/10 p-3 text-left hover:bg-white/5" key={capsule.id} onClick={()=>capsule.tabs.forEach(openFile)}><div className="text-xs">{capsule.name}</div><div className="text-[10px] text-white/35">{capsule.branch??'folder'} · {capsule.tabs.length} tabs · {new Date(capsule.at).toLocaleString()}</div></button>)}</div></section></div></div>}
+import { useCallback, useEffect, useState } from 'react';
+import { api } from '../lib/api';
+import { useStore } from '../store';
+import { useWorkspace } from '../workspace';
+type Task = { id: string; label: string; command: string; args: string[] };
+type Match = { path: string; row: number; text: string };
+type Capsule = {
+  id: string;
+  name: string;
+  branch?: string;
+  tabs: string[];
+  active?: string | null;
+  terminalOpen: boolean;
+  note: string;
+  at: number;
+};
+export default function IntelligenceView() {
+  const { status, isGitRepo, initializeGit, setToast, refresh } = useStore();
+  const { tabs, active, openFile } = useWorkspace();
+  const [trusted, setTrusted] = useState(false);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [output, setOutput] = useState('');
+  const [operation, setOperation] = useState<'merge' | 'rebase' | 'reset'>('merge');
+  const [ref, setRef] = useState('main');
+  const [symbol, setSymbol] = useState('');
+  const [replacement, setReplacement] = useState('');
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [note, setNote] = useState('');
+  const [capsules, setCapsules] = useState<Capsule[]>([]);
+  async function call<T>(method: string, ...args: unknown[]): Promise<T> {
+    const result = await api.intelInvoke(method, ...args);
+    if (!result.ok) throw new Error(result.error?.message ?? 'Workspace operation failed');
+    return result.data as T;
+  }
+  const reload = useCallback(() => {
+    void call<boolean>('trustStatus')
+      .then(setTrusted)
+      .catch(() => setTrusted(false));
+    void call<Task[]>('tasks')
+      .then(setTasks)
+      .catch(() => setTasks([]));
+    void call<Capsule[]>('capsules')
+      .then(setCapsules)
+      .catch(() => setCapsules([]));
+  }, []);
+  useEffect(reload, [reload]);
+  async function run(fn: () => Promise<void>) {
+    try {
+      await fn();
+    } catch (error) {
+      setToast((error as Error).message);
+    }
+  }
+  async function basicCheck() {
+    if (!active) {
+      setOutput('Open a file first.');
+      return;
+    }
+    const result = await api.fsRead(active);
+    if (!result.ok) {
+      setOutput(result.error?.message ?? 'Read failed');
+      return;
+    }
+    const text = result.data ?? '',
+      issues: string[] = [];
+    if (active.endsWith('.json'))
+      try {
+        JSON.parse(text);
+      } catch (error) {
+        issues.push(`JSON: ${(error as Error).message}`);
+      }
+    const pairs: Record<string, string> = { '(': ')', '[': ']', '{': '}' },
+      stack: string[] = [];
+    for (const char of text) {
+      if (pairs[char]) stack.push(pairs[char]);
+      else if (Object.values(pairs).includes(char) && stack.pop() !== char) {
+        issues.push(`Possible unbalanced delimiter: ${char}`);
+        break;
+      }
+    }
+    if (stack.length) issues.push(`Possible missing delimiter: ${stack.at(-1)}`);
+    text.split('\n').forEach((line, index) => {
+      if (/TODO|FIXME/.test(line)) issues.push(`${index + 1}: TODO/FIXME`);
+    });
+    setOutput(
+      issues.length
+        ? `Basic checks · ${active}\n${issues.join('\n')}`
+        : `Basic checks · ${active}\nNo issues found by the limited delimiter/JSON checker.`
+    );
+  }
+  return (
+    <div className="glass h-full overflow-y-auto p-5">
+      <div className="mx-auto flex max-w-4xl flex-col gap-5">
+        <header>
+          <div className="text-sm font-semibold">Luma Workspace Tools</div>
+          <div className="text-xs text-white/35">
+            Trust · project tasks · code search · workspace snapshots
+            {isGitRepo ? ' · Git previews' : ''}
+          </div>
+        </header>
+        <section className="glass-soft p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <b>Workspace Trust</b>
+              <div className="text-xs text-white/35">
+                Tasks and the integrated terminal stay disabled until this folder is trusted.
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {isGitRepo && (
+                <button
+                  className="btn text-teal"
+                  onClick={() =>
+                    run(async () => {
+                      const result = await call<{ ref: string; safety: string; stashed: boolean }>(
+                        'undoRollback'
+                      );
+                      await refresh();
+                      setToast(`Restored ${result.ref}`);
+                    })
+                  }
+                >
+                  Undo last rollback
+                </button>
+              )}
+              <button
+                className={`btn ${trusted ? 'text-teal' : 'text-amber'}`}
+                onClick={() => run(async () => setTrusted(await call('setTrust', !trusted)))}
+              >
+                {trusted ? 'Trusted ✓' : 'Trust workspace'}
+              </button>
+            </div>
+          </div>
+        </section>
+        <section className="glass-soft p-4">
+          <b>Tasks / Local Test Center</b>
+          <div className="mt-1 text-xs text-white/35">
+            Detected tasks work in folders with or without Git.
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {tasks.map((task) => (
+              <button
+                className="btn text-xs"
+                key={task.id}
+                disabled={!trusted}
+                onClick={() =>
+                  run(async () => {
+                    setOutput('Running…');
+                    const result = await call<{ ok: boolean; output: string; sha: string }>(
+                      'runTask',
+                      task
+                    );
+                    setOutput(
+                      `${result.ok ? 'PASS' : 'FAIL'} · ${result.sha.slice(0, 24)}\n${result.output}`
+                    );
+                  })
+                }
+              >
+                {task.label}
+              </button>
+            ))}
+            {!tasks.length && (
+              <span className="text-xs text-white/30">No runnable project tasks detected.</span>
+            )}
+          </div>
+          {output && (
+            <pre className="mt-3 max-h-64 overflow-auto whitespace-pre-wrap rounded-xl bg-black/25 p-3 text-[11px] text-white/60">
+              {output}
+            </pre>
+          )}
+        </section>
+        {isGitRepo ? (
+          <section className="glass-soft p-4">
+            <b>
+              Git Operation Preview{' '}
+              <span className="text-[10px] font-normal text-amber">EXPERIMENTAL</span>
+            </b>
+            <div className="mt-3 flex gap-2">
+              <select
+                className="field"
+                value={operation}
+                onChange={(event) => setOperation(event.target.value as typeof operation)}
+              >
+                <option value="merge">Merge</option>
+                <option value="rebase">Rebase</option>
+                <option value="reset">Reset</option>
+              </select>
+              <input
+                className="field flex-1"
+                value={ref}
+                onChange={(event) => setRef(event.target.value)}
+              />
+              <button
+                className="btn"
+                onClick={() =>
+                  run(async () => {
+                    const result = await call<{ summary: string; conflicts?: boolean }>(
+                      'preview',
+                      operation,
+                      ref
+                    );
+                    setOutput(
+                      `${result.conflicts ? 'POSSIBLE CONFLICTS' : 'READ-ONLY PREVIEW'}\n${result.summary}`
+                    );
+                  })
+                }
+              >
+                Preview only
+              </button>
+            </div>
+          </section>
+        ) : (
+          <section className="glass-soft flex items-center gap-4 p-4">
+            <div className="min-w-0 flex-1">
+              <b>Git is optional</b>
+              <div className="mt-1 text-xs text-white/35">
+                Keep editing normally, or initialize Git when you want History, Changes and Rescue.
+              </div>
+            </div>
+            <button className="btn text-teal" onClick={() => void initializeGit()}>
+              Initialize Git
+            </button>
+          </section>
+        )}
+        <section className="glass-soft p-4">
+          <b>
+            Code tools <span className="text-[10px] font-normal text-amber">PROTOTYPE</span>
+          </b>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button className="btn" onClick={basicCheck}>
+              Basic check active file
+            </button>
+            <input
+              className="field min-w-32 flex-1"
+              value={symbol}
+              onChange={(event) => setSymbol(event.target.value)}
+              placeholder="symbol text"
+            />
+            <button
+              className="btn"
+              disabled={!symbol.trim()}
+              onClick={() => run(async () => setMatches(await call('symbols', symbol)))}
+            >
+              Find symbol
+            </button>
+            <input
+              className="field min-w-32 flex-1"
+              value={replacement}
+              onChange={(event) => setReplacement(event.target.value)}
+              placeholder="replace with"
+            />
+            <button
+              className="btn text-amber"
+              disabled={!trusted || !matches.length || !replacement}
+              onClick={() =>
+                run(async () => {
+                  if (!window.confirm(`Replace ${matches.length} match(es)?`)) return;
+                  const result = await call<{ files: number }>('rename', symbol, replacement);
+                  setToast(`Text replaced in ${result.files} files`);
+                })
+              }
+            >
+              Text replace
+            </button>
+          </div>
+          <div className="mt-2 max-h-40 overflow-auto">
+            {matches.map((match, index) => (
+              <button
+                key={`${match.path}:${match.row}:${index}`}
+                className="block w-full truncate rounded px-2 py-1 text-left font-mono text-[11px] hover:bg-white/5"
+                onClick={() => {
+                  openFile(match.path);
+                  window.dispatchEvent(
+                    new CustomEvent('luma:reveal-line', {
+                      detail: { path: match.path, line: match.row },
+                    })
+                  );
+                }}
+              >
+                {match.path}:{match.row} · {match.text}
+              </button>
+            ))}
+          </div>
+        </section>
+        <section className="glass-soft p-4">
+          <b>Workspace snapshots</b>
+          <textarea
+            className="field mt-2 h-16 w-full"
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            placeholder="What are you working on?"
+          />
+          <button
+            className="btn btn-primary mt-2"
+            onClick={() =>
+              run(async () => {
+                await call('saveCapsule', {
+                  name: note.slice(0, 40) || `Workspace ${new Date().toLocaleString()}`,
+                  branch: status?.branch,
+                  tabs: tabs.map((tab) => tab.path),
+                  active,
+                  terminalOpen: localStorage.getItem('luma.terminalOpen') === '1',
+                  note,
+                });
+                setNote('');
+                reload();
+              })
+            }
+          >
+            Save workspace snapshot
+          </button>
+          <div className="mt-3 grid gap-2">
+            {capsules.map((capsule) => (
+              <button
+                className="rounded-xl border border-white/10 p-3 text-left hover:bg-white/5"
+                key={capsule.id}
+                onClick={() => capsule.tabs.forEach(openFile)}
+              >
+                <div className="text-xs">{capsule.name}</div>
+                <div className="text-[10px] text-white/35">
+                  {capsule.branch ?? 'folder'} · {capsule.tabs.length} tabs ·{' '}
+                  {new Date(capsule.at).toLocaleString()}
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}

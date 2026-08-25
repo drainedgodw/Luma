@@ -12,7 +12,11 @@ export const lumaHighlight = HighlightStyle.define([
   { tag: [t.string, t.special(t.string)], color: '#ce9178' },
   { tag: [t.escape], color: '#d7ba7d' },
   { tag: [t.number, t.bool, t.null, t.atom], color: '#b5cea8' },
-  { tag: [t.comment, t.lineComment, t.blockComment, t.docComment], color: '#6a9955', fontStyle: 'italic' },
+  {
+    tag: [t.comment, t.lineComment, t.blockComment, t.docComment],
+    color: '#6a9955',
+    fontStyle: 'italic',
+  },
   { tag: [t.variableName], color: '#9cdcfe' },
   { tag: [t.definition(t.variableName)], color: '#dcdcaa' },
   { tag: [t.function(t.variableName)], color: '#dcdcaa' },

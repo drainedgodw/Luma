@@ -25,7 +25,13 @@ const ACTION_STYLES: Record<RebaseAction, { label: string; color: string; bg: st
 
 const ACTION_CYCLE: RebaseAction[] = ['pick', 'squash', 'edit', 'reword', 'drop'];
 
-export default function RebaseView({ targetBranch, onClose }: { targetBranch: string; onClose: () => void }) {
+export default function RebaseView({
+  targetBranch,
+  onClose,
+}: {
+  targetBranch: string;
+  onClose: () => void;
+}) {
   const { commits, refresh, setToast, status } = useStore();
   const [todos, setTodos] = useState<TodoItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -57,7 +63,7 @@ export default function RebaseView({ targetBranch, onClose }: { targetBranch: st
             action: 'pick' as RebaseAction,
             author: c.author,
             timestamp: c.timestamp,
-          })),
+          }))
         );
       })
       .catch((e) => setToast((e as Error).message))
@@ -80,7 +86,7 @@ export default function RebaseView({ targetBranch, onClose }: { targetBranch: st
   const squashCount = useMemo(() => todos.filter((t) => t.action === 'squash').length, [todos]);
   const effectiveCount = useMemo(
     () => todos.filter((t) => t.action !== 'drop').length - squashCount,
-    [todos, squashCount],
+    [todos, squashCount]
   );
 
   function cycleAction(idx: number) {
@@ -151,7 +157,10 @@ export default function RebaseView({ targetBranch, onClose }: { targetBranch: st
   async function continueRebase() {
     try {
       await gitCall('rebaseContinue');
-      const s = await gitCall<typeof status extends undefined ? never : import('@shared/types').GitStatus>('status');
+      const s =
+        await gitCall<typeof status extends undefined ? never : import('@shared/types').GitStatus>(
+          'status'
+        );
       await refresh();
       if (s.state !== 'rebase') {
         onClose();
@@ -213,9 +222,13 @@ export default function RebaseView({ targetBranch, onClose }: { targetBranch: st
         </div>
         <div className="flex items-center gap-2 text-[10px] text-white/35">
           <span>{todos.length} commits</span>
-          {effectiveCount < todos.length && <span className="text-lilac">→ {effectiveCount} after</span>}
+          {effectiveCount < todos.length && (
+            <span className="text-lilac">→ {effectiveCount} after</span>
+          )}
         </div>
-        <button className="btn text-xs" onClick={onClose}>Cancel</button>
+        <button className="btn text-xs" onClick={onClose}>
+          Cancel
+        </button>
       </div>
 
       {/* legend */}
@@ -224,7 +237,11 @@ export default function RebaseView({ targetBranch, onClose }: { targetBranch: st
         {ACTION_CYCLE.map((a) => {
           const s = ACTION_STYLES[a];
           return (
-            <span key={a} className="rounded-full border px-2 py-0.5 text-[9px] font-medium" style={{ color: s.color, background: s.bg, borderColor: `${s.color}33` }}>
+            <span
+              key={a}
+              className="rounded-full border px-2 py-0.5 text-[9px] font-medium"
+              style={{ color: s.color, background: s.bg, borderColor: `${s.color}33` }}
+            >
               {s.label}
             </span>
           );
@@ -255,8 +272,14 @@ export default function RebaseView({ targetBranch, onClose }: { targetBranch: st
                 onDragOver={(e) => onDragOver(e, idx)}
                 onDragEnd={onDragEnd}
                 onKeyDown={(e) => {
-                  if (e.altKey && e.key === 'ArrowUp') { e.preventDefault(); moveItem(idx, -1); }
-                  if (e.altKey && e.key === 'ArrowDown') { e.preventDefault(); moveItem(idx, 1); }
+                  if (e.altKey && e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    moveItem(idx, -1);
+                  }
+                  if (e.altKey && e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    moveItem(idx, 1);
+                  }
                 }}
                 className={`group flex items-center gap-3 rounded-xl border px-4 py-3 transition-all duration-150 ${
                   isDrop
@@ -268,14 +291,23 @@ export default function RebaseView({ targetBranch, onClose }: { targetBranch: st
               >
                 {/* drag handle */}
                 {!isDrop && (
-                  <span className="shrink-0 cursor-grab text-white/20 active:cursor-grabbing" title="Drag to reorder">⠿</span>
+                  <span
+                    className="shrink-0 cursor-grab text-white/20 active:cursor-grabbing"
+                    title="Drag to reorder"
+                  >
+                    ⠿
+                  </span>
                 )}
 
                 {/* action badge */}
                 <button
                   onClick={() => cycleAction(idx)}
                   className="shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-medium transition-all duration-150 hover:scale-105"
-                  style={{ color: style.color, background: style.bg, borderColor: `${style.color}44` }}
+                  style={{
+                    color: style.color,
+                    background: style.bg,
+                    borderColor: `${style.color}44`,
+                  }}
                   title="Click to change action"
                 >
                   {style.label}
@@ -289,12 +321,16 @@ export default function RebaseView({ targetBranch, onClose }: { targetBranch: st
                       value={editMsg}
                       onChange={(e) => setEditMsg(e.target.value)}
                       onBlur={() => {
-                        setTodos((prev) => prev.map((t, i) => (i === idx ? { ...t, message: editMsg } : t)));
+                        setTodos((prev) =>
+                          prev.map((t, i) => (i === idx ? { ...t, message: editMsg } : t))
+                        );
                         setEditIdx(null);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
-                          setTodos((prev) => prev.map((t, i) => (i === idx ? { ...t, message: editMsg } : t)));
+                          setTodos((prev) =>
+                            prev.map((t, i) => (i === idx ? { ...t, message: editMsg } : t))
+                          );
                           setEditIdx(null);
                         }
                         if (e.key === 'Escape') setEditIdx(null);
@@ -311,23 +347,47 @@ export default function RebaseView({ targetBranch, onClose }: { targetBranch: st
                           setEditMsg(todo.message);
                         }
                       }}
-                      title={todo.action === 'reword' || todo.action === 'edit' ? 'Double-click to edit message' : todo.message}
+                      title={
+                        todo.action === 'reword' || todo.action === 'edit'
+                          ? 'Double-click to edit message'
+                          : todo.message
+                      }
                     >
                       {todo.message}
                     </div>
                   )}
                   <div className="flex items-center gap-2 text-[10px] text-white/30">
-                    <span className="font-mono" style={{ color: isDrop ? undefined : style.color }}>{todo.shortHash}</span>
+                    <span className="font-mono" style={{ color: isDrop ? undefined : style.color }}>
+                      {todo.shortHash}
+                    </span>
                     <span>{todo.author}</span>
                   </div>
                 </div>
 
                 {/* actions */}
                 <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                  <button className="rounded px-1.5 py-0.5 text-[10px] text-white/40 hover:bg-white/10 hover:text-white/70" title="Move up" onClick={() => moveItem(idx, -1)}>↑</button>
-                  <button className="rounded px-1.5 py-0.5 text-[10px] text-white/40 hover:bg-white/10 hover:text-white/70" title="Move down" onClick={() => moveItem(idx, 1)}>↓</button>
+                  <button
+                    className="rounded px-1.5 py-0.5 text-[10px] text-white/40 hover:bg-white/10 hover:text-white/70"
+                    title="Move up"
+                    onClick={() => moveItem(idx, -1)}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    className="rounded px-1.5 py-0.5 text-[10px] text-white/40 hover:bg-white/10 hover:text-white/70"
+                    title="Move down"
+                    onClick={() => moveItem(idx, 1)}
+                  >
+                    ↓
+                  </button>
                   {todo.action === 'drop' && (
-                    <button className="rounded px-1.5 py-0.5 text-[10px] text-white/40 hover:bg-white/10 hover:text-white/70" title="Undo drop" onClick={() => cycleAction(idx)}>↩</button>
+                    <button
+                      className="rounded px-1.5 py-0.5 text-[10px] text-white/40 hover:bg-white/10 hover:text-white/70"
+                      title="Undo drop"
+                      onClick={() => cycleAction(idx)}
+                    >
+                      ↩
+                    </button>
                   )}
                 </div>
               </div>
@@ -348,19 +408,29 @@ export default function RebaseView({ targetBranch, onClose }: { targetBranch: st
 
         {conflict ? (
           <>
-            <span className="text-xs text-amber">⚠ Conflict detected — resolve in Changes, then continue</span>
-            <button className="btn btn-danger text-xs" onClick={abortRebase}>Abort rebase</button>
-            <button className="btn btn-primary text-xs" onClick={continueRebase}>Continue</button>
+            <span className="text-xs text-amber">
+              ⚠ Conflict detected — resolve in Changes, then continue
+            </span>
+            <button className="btn btn-danger text-xs" onClick={abortRebase}>
+              Abort rebase
+            </button>
+            <button className="btn btn-primary text-xs" onClick={continueRebase}>
+              Continue
+            </button>
           </>
         ) : (
           <>
-            <button className="btn text-xs" onClick={() => setConfirmAbort(true)}>Cancel</button>
+            <button className="btn text-xs" onClick={() => setConfirmAbort(true)}>
+              Cancel
+            </button>
             <button
               className="btn btn-primary text-xs"
               disabled={running || todos.filter((t) => t.action !== 'drop').length === 0}
               onClick={executeRebase}
             >
-              {running ? 'Rebasing…' : `Start rebase${effectiveCount !== todos.length ? ` (${effectiveCount} commits)` : ''}`}
+              {running
+                ? 'Rebasing…'
+                : `Start rebase${effectiveCount !== todos.length ? ` (${effectiveCount} commits)` : ''}`}
             </button>
           </>
         )}
@@ -371,10 +441,16 @@ export default function RebaseView({ targetBranch, onClose }: { targetBranch: st
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <div className="glass anim-in w-[400px] p-5">
             <div className="mb-2 text-sm font-semibold text-amber">Cancel rebase?</div>
-            <div className="mb-4 text-xs text-white/50">All changes to the rebase plan will be lost.</div>
+            <div className="mb-4 text-xs text-white/50">
+              All changes to the rebase plan will be lost.
+            </div>
             <div className="flex justify-end gap-2">
-              <button className="btn text-xs" onClick={() => setConfirmAbort(false)}>Keep editing</button>
-              <button className="btn btn-danger text-xs" onClick={onClose}>Discard & close</button>
+              <button className="btn text-xs" onClick={() => setConfirmAbort(false)}>
+                Keep editing
+              </button>
+              <button className="btn btn-danger text-xs" onClick={onClose}>
+                Discard & close
+              </button>
             </div>
           </div>
         </div>

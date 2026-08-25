@@ -1,13 +1,215 @@
-import { useCallback,useEffect,useState } from 'react';
-import { api } from '../lib/api';import { useStore } from '../store';
-export interface GitHubAccount{login:string;name?:string;avatarUrl?:string}export interface GitHubRepo{id:number;name:string;fullName:string;description?:string;private:boolean;updatedAt:string;defaultBranch:string;httpsUrl:string;sshUrl:string;owner:string}
-export default function GitHubView(){const{openRepo,setToast}=useStore(),[account,setAccount]=useState<GitHubAccount|null>(null),[token,setToken]=useState(''),[repos,setRepos]=useState<GitHubRepo[]>([]),[query,setQuery]=useState(''),[transport,setTransport]=useState<'https'|'ssh'>('https'),[busy,setBusy]=useState(false),[deviceAvailable,setDeviceAvailable]=useState(false);
- const loadStatus=useCallback(async()=>{const r=await api.githubStatus();if(r.ok&&r.data){setAccount(r.data.connected?r.data.account??null:null);setDeviceAvailable(r.data.deviceFlowAvailable)}},[]);
- const loadRepos=useCallback(async(search='')=>{setBusy(true);const r=await api.githubRepos(search);setBusy(false);if(r.ok&&r.data)setRepos(r.data);else setToast(r.error?.message??'Failed to load GitHub repositories')},[setToast]);
- useEffect(()=>{loadStatus()},[loadStatus]);useEffect(()=>{if(account)loadRepos()},[account,loadRepos]);
- async function connect(){setBusy(true);const r=await api.githubSaveToken(token);setBusy(false);if(r.ok&&r.data){setAccount(r.data);setToken('');setToast(`Connected to GitHub as ${r.data.login}`)}else setToast(r.error?.message??'GitHub connection failed')}
- async function disconnect(){await api.githubLogout();setAccount(null);setRepos([]);setToast('GitHub disconnected; local repositories and SSH keys were not changed')}
- async function clone(repo:GitHubRepo){setBusy(true);const r=await api.githubClone(repo,transport);setBusy(false);if(r.ok&&r.data){setToast(`Cloned ${repo.fullName}`);await openRepo(r.data)}else if(!r.ok&&r.error?.message!=='canceled')setToast(r.error?.message??'Clone failed')}
- if(!account)return <div className="glass flex h-full min-h-0 flex-col overflow-hidden"><Header/><div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6"><div className="glass-soft w-full max-w-xl p-6"><div className="text-lg font-semibold text-white/90">Connect GitHub</div><p className="mt-2 text-xs leading-5 text-white/45">Use a fine-grained personal access token. Luma validates it with GitHub, encrypts it with Electron safeStorage, and never writes it into a remote URL or command log.</p><div className="mt-4 flex gap-2"><input className="field min-w-0 flex-1 font-mono text-xs" type="password" value={token} onChange={e=>setToken(e.target.value)} placeholder="github_pat_…" autoComplete="off"/><button className="btn btn-primary text-xs" disabled={busy||token.trim().length<20} onClick={connect}>{busy?'Checking…':'Connect'}</button></div><div className="mt-3 flex flex-wrap items-center gap-3 text-[11px]"><button className="text-lilac hover:underline" onClick={()=>api.openExternal('https://github.com/settings/personal-access-tokens/new')}>Create fine-grained token ↗</button><span className="text-white/30">Permissions: Metadata read, Contents read/write</span></div><div className="mt-5 rounded-xl border border-white/8 bg-black/15 p-3 text-[11px] text-white/35">OAuth Device Flow: {deviceAvailable?'available in this build':'prepared, but a registered Luma GitHub OAuth Client ID is still required.'}</div></div></div></div>;
- return <div className="glass flex h-full min-h-0 flex-col overflow-hidden"><Header/><div className="flex items-center gap-3 border-b border-white/8 px-4 py-3"><div className="flex h-8 w-8 items-center justify-center rounded-full bg-lilac/15 font-mono text-[11px] text-lilac">GH</div><div><div className="text-xs text-white/85">{account.name||account.login}</div><div className="text-[10px] text-white/35">@{account.login}</div></div><div className="flex-1"/><div className="flex overflow-hidden rounded-lg border border-white/10"><button className={`px-3 py-1.5 text-[10px] ${transport==='https'?'bg-lilac/15 text-lilac':'text-white/40'}`} onClick={()=>setTransport('https')}>HTTPS</button><button className={`px-3 py-1.5 text-[10px] ${transport==='ssh'?'bg-lilac/15 text-lilac':'text-white/40'}`} onClick={()=>setTransport('ssh')}>SSH</button></div><button className="btn px-3 py-1.5 text-[10px]" onClick={disconnect}>Sign out</button></div><div className="flex items-center gap-2 border-b border-white/8 px-4 py-2.5"><input className="field min-w-0 flex-1 text-xs" value={query} onChange={e=>setQuery(e.target.value)} onKeyDown={e=>{if(e.key==='Enter')loadRepos(query)}} placeholder="Search repositories…"/><button className="btn text-xs" disabled={busy} onClick={()=>loadRepos(query)}>{busy?'Loading…':'Search'}</button></div><div className="min-h-0 flex-1 overflow-y-auto p-3"><div className="mx-auto flex max-w-4xl flex-col gap-2">{repos.map(repo=><div key={repo.id} className="glass-soft group flex items-center gap-4 px-4 py-3"><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><span className="truncate text-[13px] text-white/85">{repo.fullName}</span>{repo.private&&<span className="rounded-full border border-amber/30 px-1.5 py-0.5 text-[8px] uppercase text-amber">private</span>}</div><div className="mt-0.5 truncate text-[11px] text-white/35">{repo.description||'No description'} · {repo.defaultBranch}</div></div><button className="btn btn-primary px-3 py-1.5 text-[10px]" disabled={busy} onClick={()=>clone(repo)}>Clone via {transport.toUpperCase()}</button></div>)}{!busy&&repos.length===0&&<div className="p-8 text-center text-xs text-white/35">No repositories loaded.</div>}</div></div></div>}
-function Header(){return <div className="border-b border-white/8 px-5 py-3"><div className="text-[11px] uppercase tracking-wider text-white/40">GitHub</div><div className="mt-0.5 text-[10px] text-white/25">Connect, choose, clone and open repositories without leaving Luma</div></div>}
+import { useCallback, useEffect, useState } from 'react';
+import { api } from '../lib/api';
+import { useStore } from '../store';
+export interface GitHubAccount {
+  login: string;
+  name?: string;
+  avatarUrl?: string;
+}
+export interface GitHubRepo {
+  id: number;
+  name: string;
+  fullName: string;
+  description?: string;
+  private: boolean;
+  updatedAt: string;
+  defaultBranch: string;
+  httpsUrl: string;
+  sshUrl: string;
+  owner: string;
+}
+export default function GitHubView() {
+  const { openRepo, setToast } = useStore();
+  const [account, setAccount] = useState<GitHubAccount | null>(null);
+  const [token, setToken] = useState('');
+  const [repos, setRepos] = useState<GitHubRepo[]>([]);
+  const [query, setQuery] = useState('');
+  const [transport, setTransport] = useState<'https' | 'ssh'>('https');
+  const [busy, setBusy] = useState(false);
+  const [deviceAvailable, setDeviceAvailable] = useState(false);
+  const loadStatus = useCallback(async () => {
+    const r = await api.githubStatus();
+    if (r.ok && r.data) {
+      setAccount(r.data.connected ? (r.data.account ?? null) : null);
+      setDeviceAvailable(r.data.deviceFlowAvailable);
+    }
+  }, []);
+  const loadRepos = useCallback(
+    async (search = '') => {
+      setBusy(true);
+      const r = await api.githubRepos(search);
+      setBusy(false);
+      if (r.ok && r.data) setRepos(r.data);
+      else setToast(r.error?.message ?? 'Failed to load GitHub repositories');
+    },
+    [setToast]
+  );
+  useEffect(() => {
+    loadStatus();
+  }, [loadStatus]);
+  useEffect(() => {
+    if (account) loadRepos();
+  }, [account, loadRepos]);
+  async function connect() {
+    setBusy(true);
+    const r = await api.githubSaveToken(token);
+    setBusy(false);
+    if (r.ok && r.data) {
+      setAccount(r.data);
+      setToken('');
+      setToast(`Connected to GitHub as ${r.data.login}`);
+    } else setToast(r.error?.message ?? 'GitHub connection failed');
+  }
+  async function disconnect() {
+    await api.githubLogout();
+    setAccount(null);
+    setRepos([]);
+    setToast('GitHub disconnected; local repositories and SSH keys were not changed');
+  }
+  async function clone(repo: GitHubRepo) {
+    setBusy(true);
+    const r = await api.githubClone(repo, transport);
+    setBusy(false);
+    if (r.ok && r.data) {
+      setToast(`Cloned ${repo.fullName}`);
+      await openRepo(r.data);
+    } else if (!r.ok && r.error?.message !== 'canceled')
+      setToast(r.error?.message ?? 'Clone failed');
+  }
+  if (!account)
+    return (
+      <div className="glass flex h-full min-h-0 flex-col overflow-hidden">
+        <Header />
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
+          <div className="glass-soft w-full max-w-xl p-6">
+            <div className="text-lg font-semibold text-white/90">Connect GitHub</div>
+            <p className="mt-2 text-xs leading-5 text-white/45">
+              Use a fine-grained personal access token. Luma validates it with GitHub, encrypts it
+              with Electron safeStorage, and never writes it into a remote URL or command log.
+            </p>
+            <div className="mt-4 flex gap-2">
+              <input
+                className="field min-w-0 flex-1 font-mono text-xs"
+                type="password"
+                value={token}
+                onChange={(e) => setToken(e.target.value)}
+                placeholder="github_pat_…"
+                autoComplete="off"
+              />
+              <button
+                className="btn btn-primary text-xs"
+                disabled={busy || token.trim().length < 20}
+                onClick={connect}
+              >
+                {busy ? 'Checking…' : 'Connect'}
+              </button>
+            </div>
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px]">
+              <button
+                className="text-lilac hover:underline"
+                onClick={() =>
+                  api.openExternal('https://github.com/settings/personal-access-tokens/new')
+                }
+              >
+                Create fine-grained token ↗
+              </button>
+              <span className="text-white/30">Permissions: Metadata read, Contents read/write</span>
+            </div>
+            <div className="mt-5 rounded-xl border border-white/8 bg-black/15 p-3 text-[11px] text-white/35">
+              OAuth Device Flow:{' '}
+              {deviceAvailable
+                ? 'available in this build'
+                : 'prepared, but a registered Luma GitHub OAuth Client ID is still required.'}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  return (
+    <div className="glass flex h-full min-h-0 flex-col overflow-hidden">
+      <Header />
+      <div className="flex items-center gap-3 border-b border-white/8 px-4 py-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-lilac/15 font-mono text-[11px] text-lilac">
+          GH
+        </div>
+        <div>
+          <div className="text-xs text-white/85">{account.name || account.login}</div>
+          <div className="text-[10px] text-white/35">@{account.login}</div>
+        </div>
+        <div className="flex-1" />
+        <div className="flex overflow-hidden rounded-lg border border-white/10">
+          <button
+            className={`px-3 py-1.5 text-[10px] ${transport === 'https' ? 'bg-lilac/15 text-lilac' : 'text-white/40'}`}
+            onClick={() => setTransport('https')}
+          >
+            HTTPS
+          </button>
+          <button
+            className={`px-3 py-1.5 text-[10px] ${transport === 'ssh' ? 'bg-lilac/15 text-lilac' : 'text-white/40'}`}
+            onClick={() => setTransport('ssh')}
+          >
+            SSH
+          </button>
+        </div>
+        <button className="btn px-3 py-1.5 text-[10px]" onClick={disconnect}>
+          Sign out
+        </button>
+      </div>
+      <div className="flex items-center gap-2 border-b border-white/8 px-4 py-2.5">
+        <input
+          className="field min-w-0 flex-1 text-xs"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') loadRepos(query);
+          }}
+          placeholder="Search repositories…"
+        />
+        <button className="btn text-xs" disabled={busy} onClick={() => loadRepos(query)}>
+          {busy ? 'Loading…' : 'Search'}
+        </button>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-3">
+        <div className="mx-auto flex max-w-4xl flex-col gap-2">
+          {repos.map((repo) => (
+            <div key={repo.id} className="glass-soft group flex items-center gap-4 px-4 py-3">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="truncate text-[13px] text-white/85">{repo.fullName}</span>
+                  {repo.private && (
+                    <span className="rounded-full border border-amber/30 px-1.5 py-0.5 text-[8px] uppercase text-amber">
+                      private
+                    </span>
+                  )}
+                </div>
+                <div className="mt-0.5 truncate text-[11px] text-white/35">
+                  {repo.description || 'No description'} · {repo.defaultBranch}
+                </div>
+              </div>
+              <button
+                className="btn btn-primary px-3 py-1.5 text-[10px]"
+                disabled={busy}
+                onClick={() => clone(repo)}
+              >
+                Clone via {transport.toUpperCase()}
+              </button>
+            </div>
+          ))}
+          {!busy && repos.length === 0 && (
+            <div className="p-8 text-center text-xs text-white/35">No repositories loaded.</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+function Header() {
+  return (
+    <div className="border-b border-white/8 px-5 py-3">
+      <div className="text-[11px] uppercase tracking-wider text-white/40">GitHub</div>
+      <div className="mt-0.5 text-[10px] text-white/25">
+        Connect, choose, clone and open repositories without leaving Luma
+      </div>
+    </div>
+  );
+}

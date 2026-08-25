@@ -3,14 +3,30 @@ import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
-import { parseLog, parseUnifiedDiff, parseConflictMarkers, parseStatus } from '../src/main/git/parse';
+import {
+  parseLog,
+  parseUnifiedDiff,
+  parseConflictMarkers,
+  parseStatus,
+} from '../src/main/git/parse';
 import { layoutGraph } from '../src/shared/graph';
 import * as engine from '../src/main/git/engine';
 
 let repo: string;
 
 function git(cmd: string) {
-  execSync(`git ${cmd}`, { cwd: repo, env: { ...process.env, GIT_AUTHOR_NAME: 'T', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 'T', GIT_COMMITTER_EMAIL: 't@t', GIT_AUTHOR_DATE: '2020-01-01T00:00:00', GIT_COMMITTER_DATE: '2020-01-01T00:00:00' } });
+  execSync(`git ${cmd}`, {
+    cwd: repo,
+    env: {
+      ...process.env,
+      GIT_AUTHOR_NAME: 'T',
+      GIT_AUTHOR_EMAIL: 't@t',
+      GIT_COMMITTER_NAME: 'T',
+      GIT_COMMITTER_EMAIL: 't@t',
+      GIT_AUTHOR_DATE: '2020-01-01T00:00:00',
+      GIT_COMMITTER_DATE: '2020-01-01T00:00:00',
+    },
+  });
 }
 
 beforeAll(async () => {

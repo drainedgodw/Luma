@@ -31,7 +31,13 @@ function fuzzyScore(query: string, text: string): number {
   return idx === 0 ? 3 : 2 - idx / text.length;
 }
 
-export default function CommandPalette({ commands, onClose }: { commands: Command[]; onClose: () => void }) {
+export default function CommandPalette({
+  commands,
+  onClose,
+}: {
+  commands: Command[];
+  onClose: () => void;
+}) {
   const [query, setQuery] = useState('');
   const [index, setIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -45,7 +51,10 @@ export default function CommandPalette({ commands, onClose }: { commands: Comman
 
   const results = useMemo(() => {
     return commands
-      .map((c) => ({ c, score: Math.max(fuzzyScore(query, c.label), fuzzyScore(query, c.group + ' ' + c.label)) }))
+      .map((c) => ({
+        c,
+        score: Math.max(fuzzyScore(query, c.label), fuzzyScore(query, c.group + ' ' + c.label)),
+      }))
       .filter((r) => r.score > 0)
       .sort((a, b) => b.score - a.score)
       .slice(0, 12);
@@ -81,8 +90,14 @@ export default function CommandPalette({ commands, onClose }: { commands: Comman
   }
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 pt-[12vh] backdrop-blur-sm" onMouseDown={onClose}>
-      <div className="glass anim-in w-[560px] overflow-hidden p-0" onMouseDown={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-[60] flex items-start justify-center bg-black/40 pt-[12vh] backdrop-blur-sm"
+      onMouseDown={onClose}
+    >
+      <div
+        className="glass anim-in w-[560px] overflow-hidden p-0"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
         <input
           ref={inputRef}
           value={query}
@@ -90,10 +105,16 @@ export default function CommandPalette({ commands, onClose }: { commands: Comman
           onKeyDown={onKeyDown}
           placeholder="Type a command…"
           className="w-full bg-transparent px-4 py-3.5 text-sm outline-none"
-          style={{ border: 'none', borderBottom: '1px solid rgba(255,255,255,0.08)', userSelect: 'text' }}
+          style={{
+            border: 'none',
+            borderBottom: '1px solid rgba(255,255,255,0.08)',
+            userSelect: 'text',
+          }}
         />
         <div ref={listRef} className="max-h-[46vh] overflow-y-auto p-1.5">
-          {results.length === 0 && <div className="px-3 py-4 text-xs text-white/35">No matching command</div>}
+          {results.length === 0 && (
+            <div className="px-3 py-4 text-xs text-white/35">No matching command</div>
+          )}
           {results.map(({ c }, i) => (
             <button
               key={c.id}
@@ -101,9 +122,13 @@ export default function CommandPalette({ commands, onClose }: { commands: Comman
               onMouseEnter={() => setIndex(i)}
               className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left ${i === index ? 'bg-lilac/15 text-white' : 'text-white/70 hover:bg-white/5'}`}
             >
-              <span className="w-20 shrink-0 text-[10px] uppercase tracking-wider text-white/30">{c.group}</span>
+              <span className="w-20 shrink-0 text-[10px] uppercase tracking-wider text-white/30">
+                {c.group}
+              </span>
               <span className="flex-1 truncate text-[13px]">{c.label}</span>
-              {c.hint && <span className="shrink-0 font-mono text-[10px] text-white/35">{c.hint}</span>}
+              {c.hint && (
+                <span className="shrink-0 font-mono text-[10px] text-white/35">{c.hint}</span>
+              )}
             </button>
           ))}
         </div>

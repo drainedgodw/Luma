@@ -58,35 +58,42 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
   }, [active, loadedRepo, repo, tabs]);
 
   const openFile = useCallback((path: string) => {
-    setTabs((previous) => previous.some((tab) => tab.path === path)
-      ? previous
-      : [...previous, tabFromPath(path)]);
+    setTabs((previous) =>
+      previous.some((tab) => tab.path === path) ? previous : [...previous, tabFromPath(path)]
+    );
     setActive(path);
   }, []);
 
   const closeTab = useCallback((path: string) => {
     setTabs((previous) => {
       const target = previous.find((tab) => tab.path === path);
-      if (target?.dirty && !window.confirm(`Close ${target.name} and discard unsaved changes?`)) return previous;
+      if (target?.dirty && !window.confirm(`Close ${target.name} and discard unsaved changes?`))
+        return previous;
       const next = previous.filter((tab) => tab.path !== path);
-      setActive((current) => current === path ? next.at(-1)?.path ?? null : current);
+      setActive((current) => (current === path ? (next.at(-1)?.path ?? null) : current));
       return next;
     });
   }, []);
 
   const markDirty = useCallback((path: string, dirty: boolean) => {
-    setTabs((previous) => previous.map((tab) => tab.path === path ? { ...tab, dirty } : tab));
+    setTabs((previous) => previous.map((tab) => (tab.path === path ? { ...tab, dirty } : tab)));
   }, []);
 
-  return <Ctx.Provider value={{
-    tabs,
-    active,
-    openFile,
-    closeTab,
-    setActive,
-    markDirty,
-    editorVisible: tabs.length > 0,
-  }}>{children}</Ctx.Provider>;
+  return (
+    <Ctx.Provider
+      value={{
+        tabs,
+        active,
+        openFile,
+        closeTab,
+        setActive,
+        markDirty,
+        editorVisible: tabs.length > 0,
+      }}
+    >
+      {children}
+    </Ctx.Provider>
+  );
 }
 
 export async function saveFile(path: string, content: string) {

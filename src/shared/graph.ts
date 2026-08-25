@@ -6,7 +6,7 @@ export interface LaidOutCommit extends Commit {
 
 /**
  * Assign lanes to commits in topological order (newest first),
- * Obsidian-style: each active branch gets its own lane; a lane is freed
+ * Each active branch gets its own lane; a lane is freed
  * when its commit is rendered and all parents are accounted for.
  */
 export function layoutGraph(commits: Omit<Commit, 'lane'>[]): LaidOutCommit[] {
@@ -22,7 +22,8 @@ export function layoutGraph(commits: Omit<Commit, 'lane'>[]): LaidOutCommit[] {
   const freeLanes: number[] = [];
   const result: LaidOutCommit[] = [];
 
-  const takeLane = (): number => (freeLanes.length ? freeLanes.pop()! : laneOf.size + freeLanes.length);
+  const takeLane = (): number =>
+    freeLanes.length ? freeLanes.pop()! : laneOf.size + freeLanes.length;
 
   let nextNewLane = 0;
   const allocLane = (): number => {

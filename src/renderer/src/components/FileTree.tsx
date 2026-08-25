@@ -29,7 +29,13 @@ interface Menu {
  * Explorer shutter. Pinned: always in place. Auto: a transform-only overlay
  * that wakes from the full-height line on the right edge of the nav rail.
  */
-export default function FileTree({ awake, onCollapse }: { awake: boolean; onCollapse: () => void }) {
+export default function FileTree({
+  awake,
+  onCollapse,
+}: {
+  awake: boolean;
+  onCollapse: () => void;
+}) {
   const { repo } = useStore();
   const { openFile, active } = useWorkspace();
   const { settings } = useSettings();
@@ -46,18 +52,21 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
     api.fsList('').then((r) => setTree((r.data ?? []).map(toNode(''))));
   }, []);
 
-  const refreshDir = useCallback(async (parent: string) => {
-    if (!parent) return reload();
-    const rr = await api.fsList(parent);
-    const children = (rr.data ?? []).map(toNode(parent));
-    setTree((prev) => {
-      const idx = prev.findIndex((x) => x.path === parent);
-      const copy = [...prev];
-      const oldCount = prev.filter((x) => x.path.startsWith(parent + '/')).length;
-      copy.splice(idx + 1, oldCount, ...children);
-      return copy.map((x) => (x.path === parent ? { ...x, open: true } : x));
-    });
-  }, [reload]);
+  const refreshDir = useCallback(
+    async (parent: string) => {
+      if (!parent) return reload();
+      const rr = await api.fsList(parent);
+      const children = (rr.data ?? []).map(toNode(parent));
+      setTree((prev) => {
+        const idx = prev.findIndex((x) => x.path === parent);
+        const copy = [...prev];
+        const oldCount = prev.filter((x) => x.path.startsWith(parent + '/')).length;
+        copy.splice(idx + 1, oldCount, ...children);
+        return copy.map((x) => (x.path === parent ? { ...x, open: true } : x));
+      });
+    },
+    [reload]
+  );
 
   const cancelCollapse = useCallback(() => {
     if (collapseTimer.current !== null) window.clearTimeout(collapseTimer.current);
@@ -78,17 +87,24 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
     if (!name || name === node.name) return;
     const r = await api.fsRename(node.path, name);
     if (r.ok) {
-      await refreshDir(node.path.includes('/') ? node.path.slice(0, node.path.lastIndexOf('/')) : '');
+      await refreshDir(
+        node.path.includes('/') ? node.path.slice(0, node.path.lastIndexOf('/')) : ''
+      );
     }
   }
 
   async function doDelete(node: Node) {
     setMenu(null);
-    const ok = window.confirm(`Delete ${node.dir ? 'folder' : 'file'} “${node.name}”?` + (node.dir ? ' Everything inside goes too.' : ''));
+    const ok = window.confirm(
+      `Delete ${node.dir ? 'folder' : 'file'} “${node.name}”?` +
+        (node.dir ? ' Everything inside goes too.' : '')
+    );
     if (!ok) return;
     const r = await api.fsDelete(node.path, node.dir);
     if (r.ok) {
-      await refreshDir(node.path.includes('/') ? node.path.slice(0, node.path.lastIndexOf('/')) : '');
+      await refreshDir(
+        node.path.includes('/') ? node.path.slice(0, node.path.lastIndexOf('/')) : ''
+      );
     }
   }
 
@@ -96,7 +112,9 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
     setMenu(null);
     const r = await api.fsDuplicate(node.path);
     if (r.ok) {
-      await refreshDir(node.path.includes('/') ? node.path.slice(0, node.path.lastIndexOf('/')) : '');
+      await refreshDir(
+        node.path.includes('/') ? node.path.slice(0, node.path.lastIndexOf('/')) : ''
+      );
     }
   }
 
@@ -104,10 +122,12 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
     reload();
   }, [repo, reload]);
 
-  const toNode = (parent: string) => (e: { name: string; dir: boolean }): Node => ({
-    ...e,
-    path: parent ? `${parent}/${e.name}` : e.name,
-  });
+  const toNode =
+    (parent: string) =>
+    (e: { name: string; dir: boolean }): Node => ({
+      ...e,
+      path: parent ? `${parent}/${e.name}` : e.name,
+    });
 
   const toggle = useCallback(
     async (n: Node) => {
@@ -116,7 +136,11 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
         return;
       }
       if (n.open) {
-        setTree((prev) => prev.map((x) => (x.path === n.path ? { ...x, open: false } : x)).filter((x) => !x.path.startsWith(n.path + '/')));
+        setTree((prev) =>
+          prev
+            .map((x) => (x.path === n.path ? { ...x, open: false } : x))
+            .filter((x) => !x.path.startsWith(n.path + '/'))
+        );
         return;
       }
       const r = await api.fsList(n.path);
@@ -128,7 +152,7 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
         return copy.map((x) => (x.path === n.path ? { ...x, open: true } : x));
       });
     },
-    [openFile],
+    [openFile]
   );
 
   function startCreating(parent: string, kind: 'file' | 'dir', afterPath?: string) {
@@ -142,9 +166,10 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
       return;
     }
     const name = draft.trim().replace(/\//g, '-');
-    const r = creating.kind === 'file'
-      ? await api.fsNewFile(creating.parent, name)
-      : await api.fsNewDir(creating.parent, name);
+    const r =
+      creating.kind === 'file'
+        ? await api.fsNewFile(creating.parent, name)
+        : await api.fsNewDir(creating.parent, name);
     setCreating(null);
     if (!r.ok) return;
     if (creating.parent) {
@@ -168,7 +193,10 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
       <span className="w-3 shrink-0" />
       <span
         className="w-6 shrink-0 rounded text-center text-[8px] font-bold leading-4"
-        style={{ color: creating.kind === 'file' ? '#94a3b8' : '#a3a3aa', background: 'rgba(255,255,255,0.06)' }}
+        style={{
+          color: creating.kind === 'file' ? '#94a3b8' : '#a3a3aa',
+          background: 'rgba(255,255,255,0.06)',
+        }}
       >
         {creating.kind === 'file' ? 'N' : 'D'}
       </span>
@@ -197,11 +225,21 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
     >
       <div className="glass flex h-full flex-col overflow-hidden" style={{ width: 240 }}>
         <div className="flex items-center gap-1 border-b border-white/8 px-3 py-2">
-          <span className="flex-1 text-[11px] uppercase tracking-wider text-white/40">Explorer</span>
-          <button className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-white/45 hover:bg-white/8 hover:text-teal" title="New file in project root" onClick={() => startCreating('', 'file')}>
+          <span className="flex-1 text-[11px] uppercase tracking-wider text-white/40">
+            Explorer
+          </span>
+          <button
+            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-white/45 hover:bg-white/8 hover:text-teal"
+            title="New file in project root"
+            onClick={() => startCreating('', 'file')}
+          >
             <Icon name="filePlus" /> file
           </button>
-          <button className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-white/45 hover:bg-white/8 hover:text-teal" title="New folder in project root" onClick={() => startCreating('', 'dir')}>
+          <button
+            className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-white/45 hover:bg-white/8 hover:text-teal"
+            title="New folder in project root"
+            onClick={() => startCreating('', 'dir')}
+          >
             <Icon name="folderPlus" /> folder
           </button>
         </div>
@@ -218,10 +256,16 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
                     setMenu({ x: e.clientX, y: e.clientY, node: n });
                   }}
                   className={`flex w-full items-center gap-1.5 px-3 py-1 text-left text-xs hover:bg-white/6 ${
-                    active === n.path ? 'bg-lilac/10 text-lilac' : n.dir ? 'text-white/70' : 'text-white/50'
+                    active === n.path
+                      ? 'bg-lilac/10 text-lilac'
+                      : n.dir
+                        ? 'text-white/70'
+                        : 'text-white/50'
                   }`}
                 >
-                  <span className="w-3 shrink-0 text-white/30">{n.dir ? (n.open ? '▾' : '▸') : ''}</span>
+                  <span className="w-3 shrink-0 text-white/30">
+                    {n.dir ? (n.open ? '▾' : '▸') : ''}
+                  </span>
                   {renaming === n.path ? (
                     <input
                       autoFocus
@@ -284,11 +328,27 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
       </div>
       {menu && (
         <>
-          <div className="fixed inset-0 z-[70]" onMouseDown={() => setMenu(null)} onContextMenu={(e) => { e.preventDefault(); setMenu(null); }} />
-          <div className="glass anim-in fixed z-[71] w-44 p-1.5" style={{ left: Math.min(menu.x, window.innerWidth - 200), top: menu.y }}>
+          <div
+            className="fixed inset-0 z-[70]"
+            onMouseDown={() => setMenu(null)}
+            onContextMenu={(e) => {
+              e.preventDefault();
+              setMenu(null);
+            }}
+          />
+          <div
+            className="glass anim-in fixed z-[71] w-44 p-1.5"
+            style={{ left: Math.min(menu.x, window.innerWidth - 200), top: menu.y }}
+          >
             {!menu.node.dir && (
               <>
-                <MenuItem label="Open in editor" onClick={() => { toggle(menu.node); setMenu(null); }} />
+                <MenuItem
+                  label="Open in editor"
+                  onClick={() => {
+                    toggle(menu.node);
+                    setMenu(null);
+                  }}
+                />
                 <MenuItem label="Duplicate" hint="copy" onClick={() => doDuplicate(menu.node)} />
               </>
             )}
@@ -302,7 +362,12 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
               }}
             />
             <div className="my-1 h-px bg-white/10" />
-            <MenuItem label={menu.node.dir ? 'Delete folder' : 'Delete file'} hint="git rm" danger onClick={() => doDelete(menu.node)} />
+            <MenuItem
+              label={menu.node.dir ? 'Delete folder' : 'Delete file'}
+              hint="git rm"
+              danger
+              onClick={() => doDelete(menu.node)}
+            />
           </div>
         </>
       )}
@@ -310,7 +375,17 @@ export default function FileTree({ awake, onCollapse }: { awake: boolean; onColl
   );
 }
 
-function MenuItem({ label, hint, onClick, danger }: { label: string; hint?: string; onClick: () => void; danger?: boolean }) {
+function MenuItem({
+  label,
+  hint,
+  onClick,
+  danger,
+}: {
+  label: string;
+  hint?: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
   return (
     <button
       onClick={onClick}

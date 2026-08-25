@@ -56,9 +56,5 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('luma:theme', on);
   });
 
-  return (
-    <Ctx.Provider value={{ settings, update }}>
-      {children}
-    </Ctx.Provider>
-  );
+  return <Ctx.Provider value={{ settings, update }}>{children}</Ctx.Provider>;
 }

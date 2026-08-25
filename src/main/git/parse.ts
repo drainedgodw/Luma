@@ -22,7 +22,12 @@ export function parseLog(out: string): Commit[] {
       email,
       timestamp: parseInt(ts, 10) || 0,
       message,
-      refs: refs ? refs.split(',').map((r) => r.trim()).filter(Boolean) : [],
+      refs: refs
+        ? refs
+            .split(',')
+            .map((r) => r.trim())
+            .filter(Boolean)
+        : [],
       lane: 0,
     });
   }
@@ -39,14 +44,27 @@ export function parseRefs(out: string): GitRef[] {
     refs.push({
       name,
       target,
-      kind: name === 'HEAD' ? 'head' : name.startsWith('refs/tags/') ? 'tag' : name.startsWith('refs/remotes/') ? 'remote' : 'branch',
+      kind:
+        name === 'HEAD'
+          ? 'head'
+          : name.startsWith('refs/tags/')
+            ? 'tag'
+            : name.startsWith('refs/remotes/')
+              ? 'remote'
+              : 'branch',
     });
   }
   return refs;
 }
 
 /** Parse `git status --porcelain=v2 --branch` */
-export function parseStatus(out: string): { branch?: string; upstream?: string; ahead: number; behind: number; entries: StatusEntry[] } {
+export function parseStatus(out: string): {
+  branch?: string;
+  upstream?: string;
+  ahead: number;
+  behind: number;
+  entries: StatusEntry[];
+} {
   let branch: string | undefined;
   let upstream: string | undefined;
   let ahead = 0;
@@ -82,11 +100,28 @@ export function parseStatus(out: string): { branch?: string; upstream?: string; 
     } else if (line.startsWith('u ')) {
       const parts = line.split(' ');
       const path = unquote(parts[10]);
-      entries.push({ path, x: 'C', y: 'C', staged: false, unstaged: false, untracked: false, conflicted: true, origPath: undefined });
+      entries.push({
+        path,
+        x: 'C',
+        y: 'C',
+        staged: false,
+        unstaged: false,
+        untracked: false,
+        conflicted: true,
+        origPath: undefined,
+      });
     } else if (line.startsWith('? ') || line.startsWith('! ')) {
       const path = unquote(line.slice(2));
       if (line.startsWith('? ')) {
-        entries.push({ path, x: '?', y: '?', staged: false, unstaged: true, untracked: true, conflicted: false });
+        entries.push({
+          path,
+          x: '?',
+          y: '?',
+          staged: false,
+          unstaged: true,
+          untracked: true,
+          conflicted: false,
+        });
       }
     }
   }
@@ -115,7 +150,7 @@ function toEntry(path: string, x: string, y: string, origPath?: string): StatusE
     staged: x !== '.' && x !== '?',
     unstaged: y !== '.' && y !== '?',
     untracked: false,
-    conflicted: x === 'U' || y === 'U' || x === 'A' && y === 'A' || (x === 'D' && y === 'D'),
+    conflicted: x === 'U' || y === 'U' || (x === 'A' && y === 'A') || (x === 'D' && y === 'D'),
     origPath,
   };
 }
@@ -144,7 +179,13 @@ export function parseUnifiedDiff(out: string): DiffFile[] {
     } else if (cur && line.startsWith('Binary files')) {
       cur.binary = true;
     } else if ((m = line.match(/^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@/))) {
-      hunk = { oldStart: +m[1], oldLines: m[2] ? +m[2] : 1, newStart: +m[3], newLines: m[4] ? +m[4] : 1, lines: [] };
+      hunk = {
+        oldStart: +m[1],
+        oldLines: m[2] ? +m[2] : 1,
+        newStart: +m[3],
+        newLines: m[4] ? +m[4] : 1,
+        lines: [],
+      };
       (cur as DiffFile).hunks.push(hunk);
       oldNo = hunk.oldStart;
       newNo = hunk.newStart;
@@ -170,7 +211,10 @@ export function parseUnifiedDiff(out: string): DiffFile[] {
  * Parse conflicted file content into conflict regions.
  * Expects file with <<<<<<< ======= >>>>>>> markers.
  */
-export function parseConflictMarkers(content: string): { resolved: string; regions: { startLine: number; endLine: number; ours: string[]; theirs: string[] }[] } {
+export function parseConflictMarkers(content: string): {
+  resolved: string;
+  regions: { startLine: number; endLine: number; ours: string[]; theirs: string[] }[];
+} {
   const lines = content.split('\n');
   const regions: { startLine: number; endLine: number; ours: string[]; theirs: string[] }[] = [];
   const resolved: string[] = [];

@@ -46,7 +46,7 @@ export async function getWallpaper(): Promise<string | null> {
     join(homedir(), 'Pictures', 'wallpaper.jpg'),
     join(homedir(), 'Pictures', 'wallpaper.png'),
     '/usr/share/backgrounds/archlinux/archwall-paper.jpg',
-    '/usr/share/backgrounds/defaults/desktop-background.jpg',
+    '/usr/share/backgrounds/defaults/desktop-background.jpg'
   );
 
   for (const p of candidates) {
@@ -54,7 +54,12 @@ export async function getWallpaper(): Promise<string | null> {
       try {
         const buf = await readFile(p);
         const ext = (/\.(\w+)$/.exec(p)?.[1] ?? 'png').toLowerCase();
-        const mime = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : 'image/png';
+        const mime =
+          ext === 'jpg' || ext === 'jpeg'
+            ? 'image/jpeg'
+            : ext === 'webp'
+              ? 'image/webp'
+              : 'image/png';
         if (buf.length < 25 * 1024 * 1024) {
           return `data:${mime};base64,${buf.toString('base64')}`;
         }

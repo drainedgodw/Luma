@@ -1,3 +1,40 @@
-import{afterEach,describe,expect,it}from'vitest';import{mkdtemp,mkdir,rm,symlink,writeFile}from'node:fs/promises';import{tmpdir}from'node:os';import{join}from'node:path';import{resolveExistingRepoPath,resolveRepoPath}from'../src/main/pathGuard';
-const roots:string[]=[];afterEach(async()=>{await Promise.all(roots.splice(0).map(p=>rm(p,{recursive:true,force:true})))});async function tree(){const base=await mkdtemp(join(tmpdir(),'luma-security-')),repo=join(base,'repo'),outside=join(base,'outside');roots.push(base);await mkdir(repo);await mkdir(outside);await writeFile(join(repo,'ok.txt'),'ok');await writeFile(join(outside,'secret.txt'),'secret');return{repo,outside}}
-describe('repository path guard',()=>{it('allows paths inside the repository',async()=>{const{repo}=await tree();expect(resolveRepoPath(repo,'src/file.ts')).toBe(join(repo,'src/file.ts'));expect(await resolveExistingRepoPath(repo,'ok.txt')).toBe(join(repo,'ok.txt'))});it('rejects traversal and absolute paths',async()=>{const{repo}=await tree();expect(()=>resolveRepoPath(repo,'../../etc/passwd')).toThrow(/escapes/);expect(()=>resolveRepoPath(repo,'/etc/passwd')).toThrow(/Absolute/);expect(()=>resolveRepoPath(repo,'bad\0name')).toThrow(/Invalid/)});it('rejects symlinks that leave the repository',async()=>{const{repo,outside}=await tree();await symlink(outside,join(repo,'escape'));await expect(resolveExistingRepoPath(repo,'escape/secret.txt')).rejects.toThrow(/Symlink escapes/)})});
+import { afterEach, describe, expect, it } from 'vitest';
+import { mkdtemp, mkdir, rm, symlink, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { resolveExistingRepoPath, resolveRepoPath } from '../src/main/pathGuard';
+const roots: string[] = [];
+afterEach(async () => {
+  await Promise.all(roots.splice(0).map((p) => rm(p, { recursive: true, force: true })));
+});
+async function tree() {
+  const base = await mkdtemp(join(tmpdir(), 'luma-security-'));
+  const repo = join(base, 'repo');
+  const outside = join(base, 'outside');
+  roots.push(base);
+  await mkdir(repo);
+  await mkdir(outside);
+  await writeFile(join(repo, 'ok.txt'), 'ok');
+  await writeFile(join(outside, 'secret.txt'), 'secret');
+  return { repo, outside };
+}
+describe('repository path guard', () => {
+  it('allows paths inside the repository', async () => {
+    const { repo } = await tree();
+    expect(resolveRepoPath(repo, 'src/file.ts')).toBe(join(repo, 'src/file.ts'));
+    expect(await resolveExistingRepoPath(repo, 'ok.txt')).toBe(join(repo, 'ok.txt'));
+  });
+  it('rejects traversal and absolute paths', async () => {
+    const { repo } = await tree();
+    expect(() => resolveRepoPath(repo, '../../etc/passwd')).toThrow(/escapes/);
+    expect(() => resolveRepoPath(repo, '/etc/passwd')).toThrow(/Absolute/);
+    expect(() => resolveRepoPath(repo, 'bad\0name')).toThrow(/Invalid/);
+  });
+  it('rejects symlinks that leave the repository', async () => {
+    const { repo, outside } = await tree();
+    await symlink(outside, join(repo, 'escape'));
+    await expect(resolveExistingRepoPath(repo, 'escape/secret.txt')).rejects.toThrow(
+      /Symlink escapes/
+    );
+  });
+});

@@ -2,22 +2,183 @@ import { app, BrowserWindow, dialog, safeStorage } from 'electron';
 import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runGit, tryGit } from './git/exec';
-export interface GitHubAccount { login: string; name?: string; avatarUrl?: string }
-export interface GitHubRepo { id: number; name: string; fullName: string; description?: string; private: boolean; updatedAt: string; defaultBranch: string; httpsUrl: string; sshUrl: string; owner: string }
-const authPath=()=>join(app.getPath('userData'),'github-auth.json');
-const askpassPath=()=>join(app.getPath('userData'),'luma-github-askpass.sh');
-async function token():Promise<string|null>{try{if(!safeStorage.isEncryptionAvailable())return null;const saved=JSON.parse(await readFile(authPath(),'utf8')) as {encrypted:string};return safeStorage.decryptString(Buffer.from(saved.encrypted,'base64'))}catch{return null}}
-async function githubFetch<T>(path:string,authToken?:string):Promise<T>{const value=authToken??await token();if(!value)throw new Error('GitHub is not connected');const endpoint='https://'+'api.github.com'+path;const response=await fetch(endpoint,{headers:{Accept:'application/vnd.github+json',Authorization:`Bearer ${value}`,'X-GitHub-Api-Version':'2022-11-28','User-Agent':'Luma-IDE'}});if(!response.ok){if(response.status===401)throw new Error('GitHub token is invalid or expired');if(response.status===403)throw new Error('GitHub denied access or the API rate limit was reached');throw new Error(`GitHub request failed (${response.status})`)}return response.json() as Promise<T>}
-async function accountFor(authToken?:string):Promise<GitHubAccount>{const user=await githubFetch<{login:string;name?:string;avatar_url?:string}>('/user',authToken);return{login:user.login,name:user.name,avatarUrl:user.avatar_url}}
-export async function status():Promise<{connected:boolean;account?:GitHubAccount;deviceFlowAvailable:boolean}>{const current=await token();if(!current)return{connected:false,deviceFlowAvailable:Boolean(process.env.LUMA_GITHUB_CLIENT_ID)};try{return{connected:true,account:await accountFor(current),deviceFlowAvailable:Boolean(process.env.LUMA_GITHUB_CLIENT_ID)}}catch{return{connected:false,deviceFlowAvailable:Boolean(process.env.LUMA_GITHUB_CLIENT_ID)}}}
-export async function saveToken(value:string):Promise<GitHubAccount>{const clean=value.trim();if(clean.length<20||/\s/.test(clean))throw new Error('Enter a valid fine-grained GitHub token');const account=await accountFor(clean);if(!safeStorage.isEncryptionAvailable())throw new Error('Secure credential storage is unavailable on this system');await mkdir(app.getPath('userData'),{recursive:true});const encrypted=safeStorage.encryptString(clean).toString('base64');await writeFile(authPath(),JSON.stringify({encrypted}),{mode:0o600});return account}
-export async function logout():Promise<void>{await rm(authPath(),{force:true})}
-export async function listRepos(query=''):Promise<GitHubRepo[]>{const repos=await githubFetch<Array<{id:number;name:string;full_name:string;description?:string;private:boolean;updated_at:string;default_branch:string;clone_url:string;ssh_url:string;owner:{login:string}}>>('/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member');const needle=query.trim().toLowerCase();return repos.filter(r=>!needle||r.full_name.toLowerCase().includes(needle)||r.description?.toLowerCase().includes(needle)).map(r=>({id:r.id,name:r.name,fullName:r.full_name,description:r.description,private:r.private,updatedAt:r.updated_at,defaultBranch:r.default_branch,httpsUrl:r.clone_url,sshUrl:r.ssh_url,owner:r.owner.login}))}
-async function authEnv():Promise<Record<string,string>>{const current=await token();if(!current)throw new Error('Connect GitHub before using HTTPS authentication');await mkdir(app.getPath('userData'),{recursive:true});const script='#!/bin/sh\ncase "$1" in\n  *Username*) printf "%s\\n" "x-access-token" ;;\n  *) printf "%s\\n" "$LUMA_GITHUB_TOKEN" ;;\nesac\n';await writeFile(askpassPath(),script,{mode:0o700});await chmod(askpassPath(),0o700);return{GIT_ASKPASS:askpassPath(),GIT_TERMINAL_PROMPT:'0',LUMA_GITHUB_TOKEN:current}}
-async function pathExists(path:string):Promise<boolean>{return stat(path).then(()=>true).catch(()=>false)}
-export async function cloneRepo(window:BrowserWindow,repo:GitHubRepo,transport:'https'|'ssh'):Promise<string|null>{const selected=await dialog.showOpenDialog(window,{title:`Choose where to clone ${repo.fullName}`,properties:['openDirectory','createDirectory']});if(selected.canceled||!selected.filePaths[0])return null;const parent=selected.filePaths[0],destination=join(parent,repo.name);if(await pathExists(destination))throw new Error(`Destination already exists: ${destination}`);const url=transport==='ssh'?repo.sshUrl:repo.httpsUrl;const env=transport==='https'?await authEnv():{GIT_TERMINAL_PROMPT:'0'};await runGit(parent,['clone','--progress',url,destination],env);return destination}
-async function remoteUsesGitHubHttps(repo:string):Promise<boolean>{const result=await tryGit(repo,['remote','get-url','origin']);return result.code===0&&/^https:\/\/github\.com\//i.test(result.stdout.trim())}
-export async function fetchRemote(repo:string,remote='origin'):Promise<void>{const env=await remoteUsesGitHubHttps(repo)?await authEnv():undefined;await runGit(repo,['fetch','--prune',remote],env)}
-export async function pull(repo:string):Promise<void>{const env=await remoteUsesGitHubHttps(repo)?await authEnv():undefined;await runGit(repo,['pull','--rebase'],env)}
-export async function push(repo:string,setUpstream=false):Promise<void>{const env=await remoteUsesGitHubHttps(repo)?await authEnv():undefined;const args=['push'];if(setUpstream)args.push('-u','origin','HEAD');await runGit(repo,args,env)}
-export function oauthInfo():{available:boolean;reason?:string}{return process.env.LUMA_GITHUB_CLIENT_ID?{available:true}:{available:false,reason:'OAuth Device Flow needs a registered Luma GitHub Client ID'}}
+export interface GitHubAccount {
+  login: string;
+  name?: string;
+  avatarUrl?: string;
+}
+export interface GitHubRepo {
+  id: number;
+  name: string;
+  fullName: string;
+  description?: string;
+  private: boolean;
+  updatedAt: string;
+  defaultBranch: string;
+  httpsUrl: string;
+  sshUrl: string;
+  owner: string;
+}
+const authPath = () => join(app.getPath('userData'), 'github-auth.json');
+const askpassPath = () => join(app.getPath('userData'), 'luma-github-askpass.sh');
+async function token(): Promise<string | null> {
+  try {
+    if (!safeStorage.isEncryptionAvailable()) return null;
+    const saved = JSON.parse(await readFile(authPath(), 'utf8')) as { encrypted: string };
+    return safeStorage.decryptString(Buffer.from(saved.encrypted, 'base64'));
+  } catch {
+    return null;
+  }
+}
+async function githubFetch<T>(path: string, authToken?: string): Promise<T> {
+  const value = authToken ?? (await token());
+  if (!value) throw new Error('GitHub is not connected');
+  const endpoint = 'https://' + 'api.github.com' + path;
+  const response = await fetch(endpoint, {
+    headers: {
+      Accept: 'application/vnd.github+json',
+      Authorization: `Bearer ${value}`,
+      'X-GitHub-Api-Version': '2022-11-28',
+      'User-Agent': 'Luma-IDE',
+    },
+  });
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('GitHub token is invalid or expired');
+    if (response.status === 403)
+      throw new Error('GitHub denied access or the API rate limit was reached');
+    throw new Error(`GitHub request failed (${response.status})`);
+  }
+  return response.json() as Promise<T>;
+}
+async function accountFor(authToken?: string): Promise<GitHubAccount> {
+  const user = await githubFetch<{ login: string; name?: string; avatar_url?: string }>(
+    '/user',
+    authToken
+  );
+  return { login: user.login, name: user.name, avatarUrl: user.avatar_url };
+}
+export async function status(): Promise<{
+  connected: boolean;
+  account?: GitHubAccount;
+  deviceFlowAvailable: boolean;
+}> {
+  const current = await token();
+  if (!current)
+    return { connected: false, deviceFlowAvailable: Boolean(process.env.LUMA_GITHUB_CLIENT_ID) };
+  try {
+    return {
+      connected: true,
+      account: await accountFor(current),
+      deviceFlowAvailable: Boolean(process.env.LUMA_GITHUB_CLIENT_ID),
+    };
+  } catch {
+    return { connected: false, deviceFlowAvailable: Boolean(process.env.LUMA_GITHUB_CLIENT_ID) };
+  }
+}
+export async function saveToken(value: string): Promise<GitHubAccount> {
+  const clean = value.trim();
+  if (clean.length < 20 || /\s/.test(clean))
+    throw new Error('Enter a valid fine-grained GitHub token');
+  const account = await accountFor(clean);
+  if (!safeStorage.isEncryptionAvailable())
+    throw new Error('Secure credential storage is unavailable on this system');
+  await mkdir(app.getPath('userData'), { recursive: true });
+  const encrypted = safeStorage.encryptString(clean).toString('base64');
+  await writeFile(authPath(), JSON.stringify({ encrypted }), { mode: 0o600 });
+  return account;
+}
+export async function logout(): Promise<void> {
+  await rm(authPath(), { force: true });
+}
+export async function listRepos(query = ''): Promise<GitHubRepo[]> {
+  const repos = await githubFetch<
+    Array<{
+      id: number;
+      name: string;
+      full_name: string;
+      description?: string;
+      private: boolean;
+      updated_at: string;
+      default_branch: string;
+      clone_url: string;
+      ssh_url: string;
+      owner: { login: string };
+    }>
+  >('/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member');
+  const needle = query.trim().toLowerCase();
+  return repos
+    .filter(
+      (r) =>
+        !needle ||
+        r.full_name.toLowerCase().includes(needle) ||
+        r.description?.toLowerCase().includes(needle)
+    )
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      fullName: r.full_name,
+      description: r.description,
+      private: r.private,
+      updatedAt: r.updated_at,
+      defaultBranch: r.default_branch,
+      httpsUrl: r.clone_url,
+      sshUrl: r.ssh_url,
+      owner: r.owner.login,
+    }));
+}
+async function authEnv(): Promise<Record<string, string>> {
+  const current = await token();
+  if (!current) throw new Error('Connect GitHub before using HTTPS authentication');
+  await mkdir(app.getPath('userData'), { recursive: true });
+  const script =
+    '#!/bin/sh\ncase "$1" in\n  *Username*) printf "%s\\n" "x-access-token" ;;\n  *) printf "%s\\n" "$LUMA_GITHUB_TOKEN" ;;\nesac\n';
+  await writeFile(askpassPath(), script, { mode: 0o700 });
+  await chmod(askpassPath(), 0o700);
+  return { GIT_ASKPASS: askpassPath(), GIT_TERMINAL_PROMPT: '0', LUMA_GITHUB_TOKEN: current };
+}
+async function pathExists(path: string): Promise<boolean> {
+  return stat(path)
+    .then(() => true)
+    .catch(() => false);
+}
+export async function cloneRepo(
+  window: BrowserWindow,
+  repo: GitHubRepo,
+  transport: 'https' | 'ssh'
+): Promise<string | null> {
+  const selected = await dialog.showOpenDialog(window, {
+    title: `Choose where to clone ${repo.fullName}`,
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (selected.canceled || !selected.filePaths[0]) return null;
+  const parent = selected.filePaths[0];
+  const destination = join(parent, repo.name);
+  if (await pathExists(destination)) throw new Error(`Destination already exists: ${destination}`);
+  const url = transport === 'ssh' ? repo.sshUrl : repo.httpsUrl;
+  const env = transport === 'https' ? await authEnv() : { GIT_TERMINAL_PROMPT: '0' };
+  await runGit(parent, ['clone', '--progress', url, destination], env);
+  return destination;
+}
+async function remoteUsesGitHubHttps(repo: string): Promise<boolean> {
+  const result = await tryGit(repo, ['remote', 'get-url', 'origin']);
+  return result.code === 0 && /^https:\/\/github\.com\//i.test(result.stdout.trim());
+}
+export async function fetchRemote(repo: string, remote = 'origin'): Promise<void> {
+  const env = (await remoteUsesGitHubHttps(repo)) ? await authEnv() : undefined;
+  await runGit(repo, ['fetch', '--prune', remote], env);
+}
+export async function pull(repo: string): Promise<void> {
+  const env = (await remoteUsesGitHubHttps(repo)) ? await authEnv() : undefined;
+  await runGit(repo, ['pull', '--rebase'], env);
+}
+export async function push(repo: string, setUpstream = false): Promise<void> {
+  const env = (await remoteUsesGitHubHttps(repo)) ? await authEnv() : undefined;
+  const args = ['push'];
+  if (setUpstream) args.push('-u', 'origin', 'HEAD');
+  await runGit(repo, args, env);
+}
+export function oauthInfo(): { available: boolean; reason?: string } {
+  return process.env.LUMA_GITHUB_CLIENT_ID
+    ? { available: true }
+    : { available: false, reason: 'OAuth Device Flow needs a registered Luma GitHub Client ID' };
+}

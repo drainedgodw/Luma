@@ -26,18 +26,22 @@ function availableStorage(storage?: SessionStorage): SessionStorage | null {
 }
 
 function normalizeSession(value: unknown): EditorSession {
-  const source = typeof value === 'object' && value !== null
-    ? value as { tabs?: unknown; active?: unknown }
-    : {};
+  const source =
+    typeof value === 'object' && value !== null
+      ? (value as { tabs?: unknown; active?: unknown })
+      : {};
   const candidates = Array.isArray(source.tabs) ? source.tabs : [];
-  const tabs = [...new Set(candidates
-    .filter((path): path is string => typeof path === 'string')
-    .map((path) => path.trim())
-    .filter(Boolean))].slice(0, MAX_REMEMBERED_TABS);
+  const tabs = [
+    ...new Set(
+      candidates
+        .filter((path): path is string => typeof path === 'string')
+        .map((path) => path.trim())
+        .filter(Boolean)
+    ),
+  ].slice(0, MAX_REMEMBERED_TABS);
   const requestedActive = typeof source.active === 'string' ? source.active : null;
-  const active = requestedActive && tabs.includes(requestedActive)
-    ? requestedActive
-    : tabs.at(-1) ?? null;
+  const active =
+    requestedActive && tabs.includes(requestedActive) ? requestedActive : (tabs.at(-1) ?? null);
   return { version: 1, tabs, active };
 }
 
@@ -46,7 +50,9 @@ export function readEditorSession(workspacePath: string, storage?: SessionStorag
   if (!workspacePath || !target) return { version: 1, tabs: [], active: null };
   try {
     const saved = target.getItem(editorSessionKey(workspacePath));
-    return saved ? normalizeSession(JSON.parse(saved) as unknown) : { version: 1, tabs: [], active: null };
+    return saved
+      ? normalizeSession(JSON.parse(saved) as unknown)
+      : { version: 1, tabs: [], active: null };
   } catch {
     return { version: 1, tabs: [], active: null };
   }
@@ -55,7 +61,7 @@ export function readEditorSession(workspacePath: string, storage?: SessionStorag
 export function writeEditorSession(
   workspacePath: string,
   session: Pick<EditorSession, 'tabs' | 'active'>,
-  storage?: SessionStorage,
+  storage?: SessionStorage
 ): boolean {
   const target = availableStorage(storage);
   if (!workspacePath || !target) return false;

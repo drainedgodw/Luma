@@ -8,17 +8,27 @@ import {
 
 class MemoryStorage implements SessionStorage {
   private readonly values = new Map<string, string>();
-  getItem(key: string): string | null { return this.values.get(key) ?? null; }
-  setItem(key: string, value: string): void { this.values.set(key, value); }
+  getItem(key: string): string | null {
+    return this.values.get(key) ?? null;
+  }
+  setItem(key: string, value: string): void {
+    this.values.set(key, value);
+  }
 }
 
 describe('editor workspace sessions', () => {
   it('restores open tabs and the active tab per workspace', () => {
     const storage = new MemoryStorage();
-    expect(writeEditorSession('/projects/luma', {
-      tabs: ['src/main.ts', 'README.md'],
-      active: 'src/main.ts',
-    }, storage)).toBe(true);
+    expect(
+      writeEditorSession(
+        '/projects/luma',
+        {
+          tabs: ['src/main.ts', 'README.md'],
+          active: 'src/main.ts',
+        },
+        storage
+      )
+    ).toBe(true);
 
     expect(readEditorSession('/projects/luma', storage)).toEqual({
       version: 1,
@@ -30,10 +40,13 @@ describe('editor workspace sessions', () => {
 
   it('deduplicates paths and falls back when the active tab is invalid', () => {
     const storage = new MemoryStorage();
-    storage.setItem(editorSessionKey('/work'), JSON.stringify({
-      tabs: ['a.ts', 'a.ts', '', 7, 'b.ts'],
-      active: 'deleted.ts',
-    }));
+    storage.setItem(
+      editorSessionKey('/work'),
+      JSON.stringify({
+        tabs: ['a.ts', 'a.ts', '', 7, 'b.ts'],
+        active: 'deleted.ts',
+      })
+    );
 
     expect(readEditorSession('/work', storage)).toEqual({
       version: 1,

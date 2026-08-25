@@ -9,23 +9,35 @@ export interface RunResult {
 export class GitError extends Error {
   constructor(
     public command: string,
-    public result: RunResult,
+    public result: RunResult
   ) {
     super(`git ${command}: ${result.stderr.trim() || result.stdout.trim()}`);
   }
 }
 
-export async function runGit(repo: string, args: string[], extraEnv?: Record<string, string>): Promise<string> {
+export async function runGit(
+  repo: string,
+  args: string[],
+  extraEnv?: Record<string, string>
+): Promise<string> {
   const res = await runGitRaw(repo, args, extraEnv);
   if (res.code !== 0) throw new GitError(args.join(' '), res);
   return res.stdout;
 }
 
-export async function tryGit(repo: string, args: string[], extraEnv?: Record<string, string>): Promise<RunResult> {
+export async function tryGit(
+  repo: string,
+  args: string[],
+  extraEnv?: Record<string, string>
+): Promise<RunResult> {
   return runGitRaw(repo, args, extraEnv);
 }
 
-function runGitRaw(repo: string, args: string[], extraEnv?: Record<string, string>): Promise<RunResult> {
+function runGitRaw(
+  repo: string,
+  args: string[],
+  extraEnv?: Record<string, string>
+): Promise<RunResult> {
   return new Promise((resolve, reject) => {
     const child = spawn('git', ['-c', 'core.quotepath=false', ...args], {
       cwd: repo,

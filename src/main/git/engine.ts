@@ -1,6 +1,13 @@
 import { chmod, readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import type { Commit, ConflictFile, DiffFile, GitRef, GitStatus, WorktreeState } from '../../shared/types';
+import type {
+  Commit,
+  ConflictFile,
+  DiffFile,
+  GitRef,
+  GitStatus,
+  WorktreeState,
+} from '../../shared/types';
 import { runGit, tryGit } from './exec';
 import { parseConflictMarkers, parseLog, parseRefs, parseStatus, parseUnifiedDiff } from './parse';
 
@@ -27,7 +34,13 @@ export async function getLog(repo: string, limit = 2000): Promise<Commit[]> {
 }
 
 export async function getRefs(repo: string): Promise<GitRef[]> {
-  const out = await runGit(repo, ['for-each-ref', '--format=%(refname) %(objectname)', 'refs/heads', 'refs/remotes', 'refs/tags']);
+  const out = await runGit(repo, [
+    'for-each-ref',
+    '--format=%(refname) %(objectname)',
+    'refs/heads',
+    'refs/remotes',
+    'refs/tags',
+  ]);
   const refs = parseRefs(out);
   const head = await tryGit(repo, ['rev-parse', 'HEAD']);
   if (head.code === 0) refs.push({ name: 'HEAD', kind: 'head', target: head.stdout.trim() });
@@ -151,7 +164,12 @@ export async function deleteBranch(repo: string, name: string, force = false): P
   await runGit(repo, ['branch', force ? '-D' : '-d', name]);
 }
 
-export async function merge(repo: string, ref: string, noFf = false, ffOnly = false): Promise<void> {
+export async function merge(
+  repo: string,
+  ref: string,
+  noFf = false,
+  ffOnly = false
+): Promise<void> {
   const args = ['merge', ref];
   if (noFf) args.push('--no-ff');
   if (ffOnly) args.push('--ff-only');
@@ -243,7 +261,12 @@ export async function getConflictFile(repo: string, path: string): Promise<Confl
   return { path, ours, theirs, base, regions };
 }
 
-export async function resolveConflict(repo: string, path: string, content: string, take: 'ours' | 'theirs' | 'both' | 'custom' = 'custom'): Promise<void> {
+export async function resolveConflict(
+  repo: string,
+  path: string,
+  content: string,
+  take: 'ours' | 'theirs' | 'both' | 'custom' = 'custom'
+): Promise<void> {
   let final = content;
   if (take === 'ours') final = await runGit(repo, ['show', `:2:${path}`]).catch(() => '');
   if (take === 'theirs') final = await runGit(repo, ['show', `:3:${path}`]).catch(() => '');
@@ -262,7 +285,10 @@ export async function pushTag(repo: string, tag: string): Promise<void> {
 
 export async function getRemotes(repo: string): Promise<string[]> {
   const out = await runGit(repo, ['remote']);
-  return out.split('\n').map((s) => s.trim()).filter(Boolean);
+  return out
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean);
 }
 
 export async function stashPush(repo: string, message?: string): Promise<void> {
@@ -298,7 +324,15 @@ export async function stashList(repo: string): Promise<StashEntry[]> {
   const entries: StashEntry[] = [];
   for (const rec of out.split('\n').filter(Boolean)) {
     const [ref, hash, ts, message] = rec.split('\u001f');
-    entries.push({ ref, hash, timestamp: parseInt(ts, 10) || 0, message, files: 0, insertions: 0, deletions: 0 });
+    entries.push({
+      ref,
+      hash,
+      timestamp: parseInt(ts, 10) || 0,
+      message,
+      files: 0,
+      insertions: 0,
+      deletions: 0,
+    });
   }
   for (const e of entries) {
     try {
@@ -328,7 +362,11 @@ export interface ReflogEntry {
 }
 
 export async function reflog(repo: string, limit = 30): Promise<ReflogEntry[]> {
-  const out = await runGit(repo, ['reflog', `--max-count=${limit}`, '--format=%H\u001f%h\u001f%gd\u001f%gs']);
+  const out = await runGit(repo, [
+    'reflog',
+    `--max-count=${limit}`,
+    '--format=%H\u001f%h\u001f%gd\u001f%gs',
+  ]);
   const entries: ReflogEntry[] = [];
   for (const rec of out.split('\n').filter(Boolean)) {
     const [hash, shortHash, selector, summary] = rec.split('\u001f');
@@ -353,7 +391,12 @@ export async function revertCommit(repo: string, hash: string): Promise<void> {
   await runGit(repo, ['revert', '--no-edit', hash]);
 }
 
-export async function createTag(repo: string, name: string, hash?: string, message?: string): Promise<void> {
+export async function createTag(
+  repo: string,
+  name: string,
+  hash?: string,
+  message?: string
+): Promise<void> {
   const args = ['tag'];
   if (message) args.push('-a', name, '-m', message);
   else args.push(name);
@@ -393,7 +436,11 @@ export async function getRebaseTodo(repo: string): Promise<RebaseTodoItem[] | nu
   if (todoPath.code === 0) {
     todoFile = join(repo, todoPath.stdout.trim());
   } else {
-    const applyPath = await tryGit(repo, ['rev-parse', '--git-path', 'rebase-apply/git-rebase-todo']);
+    const applyPath = await tryGit(repo, [
+      'rev-parse',
+      '--git-path',
+      'rebase-apply/git-rebase-todo',
+    ]);
     if (applyPath.code === 0) {
       todoFile = join(repo, applyPath.stdout.trim());
     } else return null;
@@ -405,7 +452,12 @@ export async function getRebaseTodo(repo: string): Promise<RebaseTodoItem[] | nu
       .filter((line) => /^(pick|squash|drop|edit|reword)\s/.test(line))
       .map((line) => {
         const m = line.match(/^(pick|squash|drop|edit|reword)\s+(\S+)\s+(.*)$/)!;
-        return { command: m[1] as RebaseTodoItem['command'], hash: m[2], shortHash: m[2].slice(0, 7), message: m[3] };
+        return {
+          command: m[1] as RebaseTodoItem['command'],
+          hash: m[2],
+          shortHash: m[2].slice(0, 7),
+          message: m[3],
+        };
       });
   } catch {
     return null;
@@ -416,7 +468,11 @@ function shellQuote(s: string): string {
   return '"' + s.replace(/[$"\\`]/g, '\\$&') + '"';
 }
 
-export async function startInteractiveRebase(repo: string, base: string, todos: RebaseTodoItem[]): Promise<void> {
+export async function startInteractiveRebase(
+  repo: string,
+  base: string,
+  todos: RebaseTodoItem[]
+): Promise<void> {
   const gitDir = (await runGit(repo, ['rev-parse', '--absolute-git-dir'])).trim();
   const lines: string[] = [];
   for (const t of todos) {
@@ -435,15 +491,11 @@ export async function startInteractiveRebase(repo: string, base: string, todos: 
   const editorPath = join(gitDir, 'luma-rebase-editor.sh');
   await writeFile(editorPath, `#!/bin/sh\nexec cp '${todoPath.replace(/'/g, "'\\''")}' "$1"\n`);
   await chmod(editorPath, 0o755);
-  await runGit(
-    repo,
-    ['rebase', '-i', base],
-    {
-      GIT_SEQUENCE_EDITOR: editorPath,
-      // squash combines messages in the prepared file; accept them as-is
-      GIT_EDITOR: 'true',
-    },
-  );
+  await runGit(repo, ['rebase', '-i', base], {
+    GIT_SEQUENCE_EDITOR: editorPath,
+    // squash combines messages in the prepared file; accept them as-is
+    GIT_EDITOR: 'true',
+  });
 }
 
 // ---- branch bridges (PR-style overview) ----
@@ -465,7 +517,12 @@ export interface BranchBridge {
 }
 
 export async function getMainBranch(repo: string): Promise<string> {
-  const symbolic = await tryGit(repo, ['symbolic-ref', '-q', '--short', 'refs/remotes/origin/HEAD']);
+  const symbolic = await tryGit(repo, [
+    'symbolic-ref',
+    '-q',
+    '--short',
+    'refs/remotes/origin/HEAD',
+  ]);
   if (symbolic.code === 0) return symbolic.stdout.trim().replace(/^origin\//, '');
   for (const candidate of ['main', 'master', 'trunk', 'develop']) {
     const r = await tryGit(repo, ['rev-parse', '-q', '--verify', `refs/heads/${candidate}`]);
@@ -475,7 +532,11 @@ export async function getMainBranch(repo: string): Promise<string> {
 }
 
 export async function listBranchBridges(repo: string, base: string): Promise<BranchBridge[]> {
-  const out = await runGit(repo, ['for-each-ref', '--format=%(refname:short)\u001f%(upstream:short)', 'refs/heads']);
+  const out = await runGit(repo, [
+    'for-each-ref',
+    '--format=%(refname:short)\u001f%(upstream:short)',
+    'refs/heads',
+  ]);
   const branches: { name: string; remoteTracking?: string }[] = [];
   for (const rec of out.split('\n').filter(Boolean)) {
     const [name, upstream] = rec.split('\u001f');
@@ -484,8 +545,19 @@ export async function listBranchBridges(repo: string, base: string): Promise<Bra
   }
   const bridges: BranchBridge[] = [];
   for (const b of branches) {
-    const counts = await tryGit(repo, ['rev-list', '--left-right', '--count', `${base}...${b.name}`]);
-    const [behind = 0, ahead = 0] = counts.code === 0 ? counts.stdout.trim().split(/\s+/).map((n) => parseInt(n, 10) || 0) : [];
+    const counts = await tryGit(repo, [
+      'rev-list',
+      '--left-right',
+      '--count',
+      `${base}...${b.name}`,
+    ]);
+    const [behind = 0, ahead = 0] =
+      counts.code === 0
+        ? counts.stdout
+            .trim()
+            .split(/\s+/)
+            .map((n) => parseInt(n, 10) || 0)
+        : [];
     const mb = await tryGit(repo, ['merge-base', base, b.name]);
     const merged = await tryGit(repo, ['merge-base', '--is-ancestor', b.name, base]);
     let insertions = 0;
@@ -515,7 +587,10 @@ export async function listBranchBridges(repo: string, base: string): Promise<Bra
     });
   }
   // most active bridges first: unmerged with commits ahead, then merged
-  return bridges.sort((a, b) => Number(b.merged) - Number(a.merged) || b.ahead - a.ahead || a.name.localeCompare(b.name));
+  return bridges.sort(
+    (a, b) =>
+      Number(b.merged) - Number(a.merged) || b.ahead - a.ahead || a.name.localeCompare(b.name)
+  );
 }
 
 export async function getRemoteUrl(repo: string): Promise<string | null> {
