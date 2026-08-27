@@ -16,7 +16,7 @@ conflicts=('luma' 'luma-git')
 options=('!strip' '!debug')
 
 source_x86_64=("https://github.com/drainedgodw/Luma/releases/download/v${pkgver}/Luma-${pkgver}.AppImage")
-sha256sums_x86_64=('7a20d60f3715da27e54b2214b6546cbc72f8f8f8a4cc3a91327df43406ec0ac7')
+sha256sums_x86_64=('e8043a023e5681c443af7aa2c7afe5591c9fb3749d2419f99e7be61e0e030ef4')
 
 noextract=("Luma-${pkgver}.AppImage")
 
