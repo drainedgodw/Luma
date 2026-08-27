@@ -27,6 +27,18 @@ export default function GitHubView() {
   const [transport, setTransport] = useState<'https' | 'ssh'>('https');
   const [busy, setBusy] = useState(false);
   const [deviceAvailable, setDeviceAvailable] = useState(false);
+  const [progress, setProgress] = useState<{
+    repo: string;
+    phase: string;
+    percent: number;
+    detail: string;
+  } | null>(null);
+  useEffect(() => {
+    api.onCloneProgress((p) => {
+      if (p.canceled) setProgress(null);
+      else setProgress({ repo: p.repo, phase: p.phase, percent: p.percent, detail: p.detail });
+    });
+  }, []);
   const loadStatus = useCallback(async () => {
     const r = await api.githubStatus();
     if (r.ok && r.data) {
@@ -68,12 +80,14 @@ export default function GitHubView() {
   }
   async function clone(repo: GitHubRepo) {
     setBusy(true);
+    setProgress({ repo: repo.fullName, phase: 'Starting', percent: 0, detail: '' });
     const r = await api.githubClone(repo, transport);
     setBusy(false);
+    setProgress(null);
     if (r.ok && r.data) {
       setToast(`Cloned ${repo.fullName}`);
       await openRepo(r.data);
-    } else if (!r.ok && r.error?.message !== 'canceled')
+    } else if (!r.ok && r.error?.message !== 'canceled' && r.error?.message !== 'Clone canceled')
       setToast(r.error?.message ?? 'Clone failed');
   }
   if (!account)
@@ -169,6 +183,28 @@ export default function GitHubView() {
           {busy ? 'Loading…' : 'Search'}
         </button>
       </div>
+      {progress && (
+        <div className="flex items-center gap-3 border-b border-white/8 px-4 py-2.5">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between text-[10px] text-white/50">
+              <span className="truncate">
+                Cloning {progress.repo} · {progress.phase}
+                {progress.detail ? ` (${progress.detail})` : ''}
+              </span>
+              <span className="font-mono">{progress.percent}%</span>
+            </div>
+            <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/8">
+              <div
+                className="h-full rounded-full bg-lilac transition-[width] duration-150"
+                style={{ width: `${Math.min(100, progress.percent)}%` }}
+              />
+            </div>
+          </div>
+          <button className="btn px-3 py-1.5 text-[10px]" onClick={() => api.githubCloneCancel()}>
+            Cancel
+          </button>
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
         <div className="mx-auto flex max-w-4xl flex-col gap-2">
           {repos.map((repo) => (

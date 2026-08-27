@@ -75,6 +75,16 @@ interface LumaApi {
     >
   >;
   githubClone(r: unknown, t: 'https' | 'ssh'): Promise<GitResult<string | null>>;
+  githubCloneCancel(): Promise<GitResult<boolean>>;
+  onCloneProgress(
+    cb: (p: {
+      repo: string;
+      phase: string;
+      percent: number;
+      detail: string;
+      canceled: boolean;
+    }) => void
+  ): void;
   intelInvoke(m: string, ...a: unknown[]): Promise<GitResult<unknown>>;
   onCommand(cb: (e: { id: number; command: string; at: number }) => void): void;
   winMin(): void;

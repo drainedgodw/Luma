@@ -37,6 +37,9 @@ contextBridge.exposeInMainWorld('luma', {
   githubLogout: () => ipcRenderer.invoke('github:logout'),
   githubRepos: (q?: string) => ipcRenderer.invoke('github:repos', q),
   githubClone: (r: unknown, t: 'https' | 'ssh') => ipcRenderer.invoke('github:clone', r, t),
+  githubCloneCancel: () => ipcRenderer.invoke('github:cloneCancel'),
+  onCloneProgress: (cb: (p: unknown) => void) =>
+    ipcRenderer.on('github:cloneProgress', (_e, x) => cb(x)),
   intelInvoke: (m: string, ...a: unknown[]) => ipcRenderer.invoke('intel:invoke', m, ...a),
   onCommand: (cb: (e: { id: number; command: string; at: number }) => void) =>
     ipcRenderer.on('git:command', (_e, x) => cb(x)),

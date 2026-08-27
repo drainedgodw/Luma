@@ -38,6 +38,9 @@ export function registerGitHubIpc(getWindow: () => BrowserWindow | null) {
       github.cloneRepo(getWindow()!, repository, transport)
     )
   );
+  ipcMain.handle('github:cloneCancel', () =>
+    wrap('git clone cancel', async () => github.cancelClone())
+  );
   ipcMain.handle('github:git:fetch', (_e, remote: string) =>
     wrap(`git fetch --prune ${remote}`, () => github.fetchRemote(repo(), remote))
   );

@@ -1,4 +1,6 @@
 import { app, BrowserWindow, dialog, safeStorage } from 'electron';
+import type { ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { chmod, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { runGit, tryGit } from './git/exec';
@@ -91,7 +93,7 @@ export async function logout(): Promise<void> {
   await rm(authPath(), { force: true });
 }
 export async function listRepos(query = ''): Promise<GitHubRepo[]> {
-  const repos = await githubFetch<
+  const page = await githubFetch<
     Array<{
       id: number;
       name: string;
@@ -104,7 +106,18 @@ export async function listRepos(query = ''): Promise<GitHubRepo[]> {
       ssh_url: string;
       owner: { login: string };
     }>
-  >('/user/repos?per_page=100&sort=updated&affiliation=owner,collaborator,organization_member');
+  >(
+    '/user/repos?per_page=100&page=1&sort=updated&affiliation=owner,collaborator,organization_member'
+  );
+  // GitHub caps /user/repos at 100 per page; follow pages until exhausted (10 pages = 1000 repos)
+  const repos = [...page];
+  for (let pageNumber = 2; pageNumber <= 10 && page.length === 100; pageNumber++) {
+    const next = await githubFetch<typeof page>(
+      `/user/repos?per_page=100&page=${pageNumber}&sort=updated&affiliation=owner,collaborator,organization_member`
+    );
+    repos.push(...next);
+    if (next.length < 100) break;
+  }
   const needle = query.trim().toLowerCase();
   return repos
     .filter(
@@ -141,6 +154,20 @@ async function pathExists(path: string): Promise<boolean> {
     .then(() => true)
     .catch(() => false);
 }
+export interface CloneProgress {
+  repo: string;
+  phase: string;
+  percent: number;
+  detail: string;
+  canceled: boolean;
+}
+let activeClone: ChildProcess | null = null;
+export function cancelClone(): boolean {
+  const child = activeClone;
+  if (!child || child.exitCode !== null) return false;
+  child.kill('SIGTERM');
+  return true;
+}
 export async function cloneRepo(
   window: BrowserWindow,
   repo: GitHubRepo,
@@ -156,7 +183,60 @@ export async function cloneRepo(
   if (await pathExists(destination)) throw new Error(`Destination already exists: ${destination}`);
   const url = transport === 'ssh' ? repo.sshUrl : repo.httpsUrl;
   const env = transport === 'https' ? await authEnv() : { GIT_TERMINAL_PROMPT: '0' };
-  await runGit(parent, ['clone', '--progress', url, destination], env);
+  const send = (progress: CloneProgress) =>
+    window.isDestroyed() ? undefined : window.webContents.send('github:cloneProgress', progress);
+  let canceled = false;
+  await new Promise<void>((resolve, reject) => {
+    // git prints --progress updates to stderr with \r separators; keep only the newest line
+    let stderrTail = '';
+    const child = spawn(
+      'git',
+      ['-c', 'core.quotepath=false', 'clone', '--progress', url, destination],
+      { cwd: parent, env: { ...process.env, GIT_OPTIONAL_LOCKS: '0', LC_ALL: 'C', ...env } }
+    );
+    activeClone = child;
+    const report = (chunk: string) => {
+      stderrTail = (stderrTail + chunk).split(/[\r\n]/).filter(Boolean).pop() ?? '';
+      const match = /^(Counting|Compressing|Receiving|Resolving|Updating)[^:]*:\s*(\d+)%?(?:\s*\(([^)]*)\))?/.exec(
+        stderrTail
+      );
+      if (match)
+        send({
+          repo: repo.fullName,
+          phase: match[1],
+          percent: Number(match[2]),
+          detail: match[3] ?? '',
+          canceled: false,
+        });
+    };
+    child.stderr.on('data', (d: Buffer) => report(d.toString('utf8')));
+    child.on('error', (error) => {
+      activeClone = null;
+      reject(error);
+    });
+    child.on('close', (code, signal) => {
+      activeClone = null;
+      canceled = signal !== null;
+      if (canceled) send({ repo: repo.fullName, phase: 'Canceling', percent: 0, detail: '', canceled: true });
+      if (code === 0) resolve();
+      else if (canceled) reject(new Error('Clone canceled'));
+      else {
+        const captured = stderrTail;
+        reject(
+          new Error(
+            captured.trim() ||
+              `git clone failed (exit ${code ?? 'unknown'}); check the URL, token permissions and network`
+          )
+        );
+      }
+    });
+  }).catch(async (error: Error) => {
+    if (canceled || error.message === 'Clone canceled') {
+      await rm(destination, { recursive: true, force: true }).catch(() => {});
+      throw new Error('Clone canceled');
+    }
+    throw error;
+  });
   return destination;
 }
 async function remoteUsesGitHubHttps(repo: string): Promise<boolean> {
