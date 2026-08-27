@@ -551,9 +551,11 @@ function Orbit({
         onWheel={wheel}
         onContextMenu={(event) => event.preventDefault()}
         onPointerDown={(event) => {
+          // Reset for every press, including presses that start on a node —
+          // otherwise a previous rotate/pan keeps swallowing the next node click.
+          moved.current = false;
           if ((event.target as Element).closest('[data-orbit-node]')) return;
           event.currentTarget.setPointerCapture(event.pointerId);
-          moved.current = false;
           drag.current = {
             clientX: event.clientX,
             clientY: event.clientY,
@@ -627,6 +629,12 @@ function Orbit({
                   if (!moved.current) void choose(item.commit);
                 }}
               >
+                <circle
+                  cx={item.point.x}
+                  cy={item.point.y}
+                  r={Math.max(10, nodeRadius + 6)}
+                  fill="transparent"
+                />
                 <circle
                   cx={item.point.x}
                   cy={item.point.y}
