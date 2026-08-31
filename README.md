@@ -17,7 +17,7 @@ A Linux-first visual Git workspace: understandable history, previewable operatio
 
 ## Why Luma?
 
-Most IDEs treat Git as a sidebar. Luma treats history as the workspace itself: inspect commits in a 3D graph, preview a rewrite before applying it, and keep a recovery point before moving HEAD.
+Most IDEs treat Git as a sidebar. Luma treats history as the workspace itself: inspect commits in a visual web, preview a rewrite before applying it, and keep a recovery point before moving HEAD.
 
 ## Install
 
@@ -43,7 +43,7 @@ The bootstrap downloads a private, compatible Node 22 and a private CPython 3.11
 
 ## Features
 
-- **History** — commit graph in two views: classic Lanes and interactive 3D Orbit (drag to rotate, wheel to zoom)
+- **History** — commit graph in two views: classic Lanes and an interactive Orbit web (drag to pan, wheel to zoom)
 - **Changes** — staging by drag & drop, diffs, conflict resolution, commit messages with a template history
 - **Visual rebase** — reorder, squash, fixup, reword and drop commits; cherry-pick, revert, tags, merge strategy choice
 - **Safety net** — Secret Guard scans staged additions, every rollback creates a checkpoint branch, Rescue browses the reflog, bisect and stash included
@@ -81,7 +81,7 @@ Full walkthrough: [docs/USERGUIDE.md](docs/USERGUIDE.md).
 **History — Lanes** — the classic commit graph with branch lanes, commit details and actions.
 ![History lanes](docs/screenshots/history_lanes.png)
 
-**History — Orbit** — the same history as an interactive 3D constellation: recent commits in the center, older ones further away; drag to rotate, wheel to zoom.
+**History — Orbit** — the same history as an Obsidian-style web of commits; drag to pan, wheel to zoom, drag a commit to place it.
 ![History orbit](docs/screenshots/history_orbit.png)
 
 **GitHub** — connect a token or SSH key, then clone, fetch, pull and push without leaving the app.

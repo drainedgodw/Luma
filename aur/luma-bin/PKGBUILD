@@ -4,7 +4,7 @@
 pkgname=luma-bin
 pkgver=0.1.0
 pkgrel=1
-pkgdesc='Visual Git-first IDE with 3D commit graph, interactive rebase, and built-in editor'
+pkgdesc='Visual Git-first IDE with a commit web, interactive rebase, and built-in editor'
 url='https://github.com/drainedgodw/Luma'
 arch=('x86_64')
 license=('MIT')
@@ -15,7 +15,7 @@ provides=('luma')
 conflicts=('luma' 'luma-git')
 options=('!strip' '!debug')
 
-source_x86_64=("https://github.com/drainedgodw/Luma/releases/download/v${pkgver}/Luma-${pkgver}.AppImage")
+source_x86_64=("{{https://github.com/drainedgodw/Luma/releases/download/v${pkgver}}}/Luma-${pkgver}.AppImage")
 sha256sums_x86_64=('cc3b37a43022a38ee0d1cdc78b959f0ed9b35a32748c95fdbb9d777563e6640e')
 
 noextract=("Luma-${pkgver}.AppImage")

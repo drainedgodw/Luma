@@ -20,12 +20,12 @@ type OrbitNode = {
   commit: LaidCommit;
   x: number;
   y: number;
-  z: number;
-  gen: number;
-  ordinal: number;
-  root: boolean;
+  vx: number;
+  vy: number;
+  fx: number | null;
+  fy: number | null;
 };
-type OrbitCamera = { yaw: number; pitch: number; zoom: number; panX: number; panY: number };
+type OrbitCamera = { x: number; y: number; k: number };
 const ROW = 62;
 const TOP = 26;
 const LANE = 34;
@@ -373,24 +373,20 @@ function Orbit({
   selected: Commit | null;
   choose: (commit: Commit) => void;
 }) {
-  const holder = useRef<HTMLDivElement>(null),
-    drag = useRef<{
-      clientX: number;
-      clientY: number;
-      camera: OrbitCamera;
-      mode: 'rotate' | 'pan';
-    } | null>(null),
-    moved = useRef(false);
-  const [size, setSize] = useState({ width: 800, height: 600 }),
-    [camera, setCamera] = useState<OrbitCamera>({
-      yaw: 0.5,
-      pitch: 0.35,
-      zoom: 1,
-      panX: 0,
-      panY: 0,
-    }),
-    [hovered, setHovered] = useState<LaidCommit | null>(null),
-    [spin, setSpin] = useState(false);
+  const holder = useRef<HTMLDivElement>(null);
+  const pan = useRef<{ clientX: number; clientY: number; camera: OrbitCamera } | null>(null);
+  const dragging = useRef<OrbitNode | null>(null);
+  const moved = useRef(false);
+  const nodes = useRef<OrbitNode[]>([]);
+  const byHash = useRef(new Map<string, OrbitNode>());
+  const links = useRef<[OrbitNode, OrbitNode][]>([]);
+  const frame = useRef(0);
+  const alpha = useRef(0);
+  const [size, setSize] = useState({ width: 800, height: 600 });
+  const [camera, setCamera] = useState<OrbitCamera>({ x: 0, y: 0, k: 1 });
+  const [hovered, setHovered] = useState<LaidCommit | null>(null);
+  const [, setTick] = useState(0);
+
   useEffect(() => {
     const element = holder.current;
     if (!element) return;
@@ -400,12 +396,86 @@ function Orbit({
     observer.observe(element);
     return () => observer.disconnect();
   }, []);
-  // Commits live in 3D: each git generation forms a ring around the root, so
-  // parent links always point inwards and it's clear what follows what.
-  const nodes = useMemo<OrbitNode[]>(() => {
-    const span = Math.min(size.width, size.height);
+
+  const meta = useMemo(() => {
     const list = commits.slice(0, 400);
     const seen = new Set(list.map((commit) => commit.hash));
+    return new Map(
+      list.map((commit, index) => [
+        commit.hash,
+        { ordinal: list.length - index, root: !commit.parents.some((p) => seen.has(p)) },
+      ])
+    );
+  }, [commits]);
+
+  const loop = () => {
+    if (frame.current) return;
+    const step = () => {
+      tick();
+      setTick((t) => t + 1);
+      frame.current =
+        alpha.current > 0.02 || dragging.current ? requestAnimationFrame(step) : 0;
+    };
+    frame.current = requestAnimationFrame(step);
+  };
+
+  const tick = () => {
+    const ns = nodes.current;
+    const a = (alpha.current *= 0.985);
+    // everything pushes apart, parents pull their kids back
+    for (let i = 0; i < ns.length; i++) {
+      const n = ns[i];
+      for (let j = i + 1; j < ns.length; j++) {
+        const m = ns[j];
+        let dx = n.x - m.x;
+        let dy = n.y - m.y;
+        let d2 = dx * dx + dy * dy;
+        if (d2 < 1) {
+          dx = Math.random() - 0.5;
+          dy = Math.random() - 0.5;
+          d2 = 1;
+        }
+        const d = Math.sqrt(d2);
+        const f = (2600 * a) / (d2 * d);
+        n.vx += dx * f;
+        n.vy += dy * f;
+        m.vx -= dx * f;
+        m.vy -= dy * f;
+      }
+      n.vx -= n.x * 0.012 * a;
+      n.vy -= n.y * 0.012 * a;
+    }
+    for (const [p, c] of links.current) {
+      const dx = c.x - p.x;
+      const dy = c.y - p.y;
+      const d = Math.sqrt(dx * dx + dy * dy) || 1;
+      const f = ((d - 100) * 0.035 * a) / d;
+      p.vx += dx * f;
+      p.vy += dy * f;
+      c.vx -= dx * f;
+      c.vy -= dy * f;
+    }
+    for (const n of ns) {
+      if (n.fx != null) {
+        n.x = n.fx;
+        n.vx = 0;
+      } else {
+        n.vx = Math.max(-40, Math.min(40, n.vx * 0.55));
+        n.x += n.vx;
+      }
+      if (n.fy != null) {
+        n.y = n.fy;
+        n.vy = 0;
+      } else {
+        n.vy = Math.max(-40, Math.min(40, n.vy * 0.55));
+        n.y += n.vy;
+      }
+    }
+  };
+
+  // rebuild the web when history or the pane itself changes
+  useEffect(() => {
+    const list = commits.slice(0, 400);
     const generation = new Map<string, number>();
     for (const commit of list.slice().reverse()) {
       let gen = 0;
@@ -423,126 +493,96 @@ function Orbit({
       rings.set(gen, ring);
     }
     const maxGen = Math.max(1, ...rings.keys());
+    const span = Math.min(size.width, size.height);
     const placed = new Map<string, { x: number; y: number }>();
     for (const [gen, ring] of rings) {
-      const radius = gen === 0 ? (ring.length > 1 ? 26 : 0) : 46 + (gen / maxGen) * span * 0.44;
+      const r = gen === 0 ? (ring.length > 1 ? 26 : 0) : 46 + (gen / maxGen) * span * 0.44;
       ring.forEach((commit, i) => {
         const angle = (i / ring.length) * Math.PI * 2 + gen * 0.7;
-        placed.set(commit.hash, { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+        placed.set(commit.hash, { x: Math.cos(angle) * r, y: Math.sin(angle) * r });
       });
     }
-    return list.map((commit, index) => {
+    nodes.current = list.map((commit) => {
       const position = placed.get(commit.hash) ?? { x: 0, y: 0 };
-      const gen = generation.get(commit.hash) ?? 0;
+      return { commit, x: position.x, y: position.y, vx: 0, vy: 0, fx: null, fy: null };
+    });
+    byHash.current = new Map(nodes.current.map((n) => [n.commit.hash, n]));
+    links.current = nodes.current.flatMap((n) =>
+      n.commit.parents.flatMap((p) => {
+        const target = byHash.current.get(p);
+        return target ? [[n, target] as [OrbitNode, OrbitNode]] : [];
+      })
+    );
+    setCamera((c) =>
+      c.x === 0 && c.y === 0 && c.k === 1 ? { x: size.width / 2, y: size.height / 2, k: 1 } : c
+    );
+    alpha.current = 1;
+    loop();
+    return () => {
+      cancelAnimationFrame(frame.current);
+      frame.current = 0;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [commits, size]);
+
+  const toWorld = (clientX: number, clientY: number) => {
+    const rect = holder.current?.getBoundingClientRect();
+    const sx = clientX - (rect?.left ?? 0);
+    const sy = clientY - (rect?.top ?? 0);
+    return { x: (sx - camera.x) / camera.k, y: (sy - camera.y) / camera.k };
+  };
+  const zoomAt = (factor: number, sx = size.width / 2, sy = size.height / 2) =>
+    setCamera((current) => {
+      const k = Math.max(0.2, Math.min(4, current.k * factor));
       return {
-        commit,
-        x: position.x,
-        y: position.y,
-        z: (gen / maxGen) * span * 0.5,
-        gen,
-        ordinal: list.length - index,
-        root: !commit.parents.some((parent) => seen.has(parent)),
+        x: sx - (sx - current.x) * (k / current.k),
+        y: sy - (sy - current.y) * (k / current.k),
+        k,
       };
     });
-  }, [commits, size]);
-  const meta = useMemo(
-    () => new Map(nodes.map((node) => [node.commit.hash, node])),
-    [nodes]
-  );
-  const perspective = useMemo(() => {
-    const cosY = Math.cos(camera.yaw);
-    const sinY = Math.sin(camera.yaw);
-    const cosP = Math.cos(camera.pitch);
-    const sinP = Math.sin(camera.pitch);
-    const cx = size.width / 2 + camera.panX;
-    const cy = size.height / 2 + camera.panY;
-    const fov = 1100;
-    const project = (node: OrbitNode) => {
-      const x1 = node.x * cosY - node.z * sinY;
-      const z1 = node.x * sinY + node.z * cosY;
-      const y2 = node.y * cosP - z1 * sinP;
-      const z2 = node.y * sinP + z1 * cosP;
-      const depth = fov / Math.max(120, fov + z2);
-      return { x: cx + x1 * depth * camera.zoom, y: cy + y2 * depth * camera.zoom, depth, z: z2 };
-    };
-    return nodes.map((node) => ({ commit: node.commit, point: project(node) }));
-  }, [nodes, camera, size]);
-  const projected = useMemo(
-    () => new Map(perspective.map((item) => [item.commit.hash, item])),
-    [perspective]
-  );
-  useEffect(() => {
-    if (!spin) return;
-    let frame = 0;
-    const step = () => {
-      setCamera((current) => ({ ...current, yaw: current.yaw + 0.006 }));
-      frame = requestAnimationFrame(step);
-    };
-    frame = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(frame);
-  }, [spin]);
-  const zoomBy = useCallback(
-    (factor: number) =>
-      setCamera((current) => ({
-        ...current,
-        zoom: Math.max(0.3, Math.min(4, current.zoom * factor)),
-      })),
-    []
-  );
-  const rotateBy = useCallback(
-    (dyaw: number, dpitch: number) =>
-      setCamera((current) => ({
-        ...current,
-        yaw: current.yaw + dyaw,
-        pitch: Math.max(-1.45, Math.min(1.45, current.pitch + dpitch)),
-      })),
-    []
-  );
+  const fit = () => {
+    const ns = nodes.current;
+    if (!ns.length) return;
+    const xs = ns.map((n) => n.x);
+    const ys = ns.map((n) => n.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const w = Math.max(60, maxX - minX);
+    const h = Math.max(60, maxY - minY);
+    const k = Math.max(
+      0.2,
+      Math.min(2, Math.min((size.width - 80) / w, (size.height - 80) / h))
+    );
+    setCamera({
+      x: size.width / 2 - ((minX + maxX) / 2) * k,
+      y: size.height / 2 - ((minY + maxY) / 2) * k,
+      k,
+    });
+  };
   const wheel = (event: WheelEvent<SVGSVGElement>) => {
     event.preventDefault();
-    zoomBy(Math.exp(-event.deltaY * 0.0015));
+    const rect = event.currentTarget.getBoundingClientRect();
+    zoomAt(Math.exp(-event.deltaY * 0.0015), event.clientX - rect.left, event.clientY - rect.top);
   };
+
   return (
     <div ref={holder} className="relative h-full min-h-[440px] overflow-hidden">
       <div className="absolute right-3 top-3 z-10 flex gap-1 rounded-xl border border-white/10 bg-black/45 p-1 text-[11px]">
-        <button className="px-2" title="Rotate left" onClick={() => rotateBy(-Math.PI / 12, 0)}>
-          ⟲
-        </button>
-        <button className="px-2" title="Rotate right" onClick={() => rotateBy(Math.PI / 12, 0)}>
-          ⟳
-        </button>
-        <button className="px-2" title="Tilt down" onClick={() => rotateBy(0, -Math.PI / 18)}>
-          ↘
-        </button>
-        <button className="px-2" title="Tilt up" onClick={() => rotateBy(0, Math.PI / 18)}>
-          ↗
-        </button>
-        <button
-          className={`px-2 ${spin ? 'text-lilac' : ''}`}
-          title="Auto-spin"
-          onClick={() => setSpin((value) => !value)}
-        >
-          ◐
-        </button>
-        <button className="px-2" onClick={() => zoomBy(1 / 1.25)}>
+        <button className="px-2" onClick={() => zoomAt(1 / 1.25)}>
           −
         </button>
-        <span className="px-1 text-[10px] leading-6">{Math.round(camera.zoom * 100)}%</span>
-        <button className="px-2" onClick={() => zoomBy(1.25)}>
+        <span className="px-1 text-[10px] leading-6">{Math.round(camera.k * 100)}%</span>
+        <button className="px-2" onClick={() => zoomAt(1.25)}>
           +
         </button>
-        <button
-          className="px-2 text-[10px]"
-          onClick={() => {
-            setCamera({ yaw: 0.5, pitch: 0.35, zoom: 1, panX: 0, panY: 0 });
-            setSpin(false);
-          }}
-        >
+        <button className="px-2 text-[10px]" onClick={fit}>
           Fit
         </button>
       </div>
       <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-[9px] text-white/45">
-        drag — rotate · shift-drag / right-drag — pan · wheel — zoom
+        drag — pan · wheel — zoom · drag a commit — place it
       </div>
       <svg
         width={size.width}
@@ -551,147 +591,137 @@ function Orbit({
         onWheel={wheel}
         onContextMenu={(event) => event.preventDefault()}
         onPointerDown={(event) => {
-          // Reset for every press, including presses that start on a node —
-          // otherwise a previous rotate/pan keeps swallowing the next node click.
           moved.current = false;
-          if ((event.target as Element).closest('[data-orbit-node]')) return;
           event.currentTarget.setPointerCapture(event.pointerId);
-          drag.current = {
-            clientX: event.clientX,
-            clientY: event.clientY,
-            camera,
-            mode: event.shiftKey || event.button === 2 ? 'pan' : 'rotate',
-          };
+          const hit = (event.target as Element).closest('[data-orbit-node]');
+          const node = hit ? byHash.current.get(hit.getAttribute('data-hash') ?? '') : undefined;
+          if (node) {
+            dragging.current = node;
+            node.fx = node.x;
+            node.fy = node.y;
+            alpha.current = Math.max(alpha.current, 0.35);
+            loop();
+            return;
+          }
+          pan.current = { clientX: event.clientX, clientY: event.clientY, camera };
         }}
         onPointerMove={(event) => {
-          if (!drag.current) return;
-          const start = drag.current;
+          if (dragging.current) {
+            const point = toWorld(event.clientX, event.clientY);
+            if (
+              Math.abs(point.x - dragging.current.x) + Math.abs(point.y - dragging.current.y) >
+              2 / camera.k
+            )
+              moved.current = true;
+            dragging.current.fx = point.x;
+            dragging.current.fy = point.y;
+            alpha.current = Math.max(alpha.current, 0.15);
+            return;
+          }
+          if (!pan.current) return;
+          const start = pan.current;
           const dx = event.clientX - start.clientX;
           const dy = event.clientY - start.clientY;
           if (Math.abs(dx) + Math.abs(dy) > 4) moved.current = true;
-          if (start.mode === 'pan')
-            setCamera({
-              ...start.camera,
-              panX: start.camera.panX + dx,
-              panY: start.camera.panY + dy,
-            });
-          else
-            setCamera({
-              ...start.camera,
-              yaw: start.camera.yaw + dx * 0.008,
-              pitch: Math.max(-1.45, Math.min(1.45, start.camera.pitch + dy * 0.008)),
-            });
+          setCamera({ ...start.camera, x: start.camera.x + dx, y: start.camera.y + dy });
         }}
         onPointerUp={(event) => {
-          if (drag.current) event.currentTarget.releasePointerCapture(event.pointerId);
-          drag.current = null;
+          if (event.currentTarget.hasPointerCapture(event.pointerId))
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          const node = dragging.current;
+          if (node) {
+            node.fx = null;
+            node.fy = null;
+            dragging.current = null;
+            if (!moved.current) void choose(node.commit);
+          }
+          pan.current = null;
         }}
       >
-        {perspective
-          .slice()
-          .sort((a, b) => b.point.z - a.point.z)
-          .flatMap((item) =>
-            item.commit.parents.map((parent) => {
-              const target = projected.get(parent);
-              return target ? (
-                <line
-                  key={`${item.commit.hash}:${parent}`}
-                  x1={item.point.x}
-                  y1={item.point.y}
-                  x2={target.point.x}
-                  y2={target.point.y}
-                  stroke={COLORS[item.commit.lane % COLORS.length]}
-                  strokeWidth={Math.max(0.4, item.point.depth)}
-                  opacity={0.18 + item.point.depth * 0.25}
-                />
-              ) : null;
-            })
-          )}
-        {perspective
-          .slice()
-          .sort((a, b) => b.point.z - a.point.z)
-          .map((item) => {
-            const active = selected?.hash === item.commit.hash;
-            const item2 = risk[item.commit.hash];
-            const node = meta.get(item.commit.hash);
-            const isHead = item.commit.refs.some((ref) => ref.includes('HEAD'));
-            const cat = categoryColor(item.commit, risk, node?.root ?? false, isHead);
-            const nodeRadius = radius(active ? 12 : 7, item2) * item.point.depth * camera.zoom;
-            const near = item.point.depth;
+        <g transform={`translate(${camera.x} ${camera.y}) scale(${camera.k})`}>
+          {links.current.map(([from, to]) => (
+            <line
+              key={`${from.commit.hash}:${to.commit.hash}`}
+              x1={from.x}
+              y1={from.y}
+              x2={to.x}
+              y2={to.y}
+              stroke={COLORS[from.commit.lane % COLORS.length]}
+              strokeWidth={1.4 / camera.k}
+              opacity=".45"
+            />
+          ))}
+          {nodes.current.map((node) => {
+            const commit = node.commit;
+            const active = selected?.hash === commit.hash;
+            const item = risk[commit.hash];
+            const info = meta.get(commit.hash);
+            const isHead = commit.refs.some((ref) => ref.includes('HEAD'));
+            const cat = categoryColor(commit, risk, info?.root ?? false, isHead);
+            const nodeRadius = radius(active ? 12 : 7, item);
             return (
               <g
                 data-orbit-node="true"
-                key={item.commit.hash}
+                data-hash={commit.hash}
+                key={commit.hash}
                 className="cursor-pointer"
-                onPointerEnter={() => setHovered(item.commit)}
+                onPointerEnter={() => setHovered(commit)}
                 onPointerLeave={() => setHovered(null)}
-                onClick={() => {
-                  if (!moved.current) void choose(item.commit);
-                }}
               >
+                <circle cx={node.x} cy={node.y} r={Math.max(10, nodeRadius + 6)} fill="transparent" />
                 <circle
-                  cx={item.point.x}
-                  cy={item.point.y}
-                  r={Math.max(10, nodeRadius + 6)}
-                  fill="transparent"
-                />
-                <circle
-                  cx={item.point.x}
-                  cy={item.point.y}
+                  cx={node.x}
+                  cy={node.y}
                   r={active ? nodeRadius + 9 : nodeRadius + 3}
                   fill={active ? 'rgba(139,92,246,.25)' : 'transparent'}
                   stroke={active ? 'rgba(196,181,253,.8)' : 'transparent'}
                   strokeWidth="2"
                 />
                 <circle
-                  cx={item.point.x}
-                  cy={item.point.y}
-                  r={Math.max(1.6, nodeRadius)}
+                  cx={node.x}
+                  cy={node.y}
+                  r={nodeRadius}
                   fill={cat.color}
-                  opacity={0.35 + near * 0.65}
                   stroke={active ? '#fff' : 'transparent'}
-                  strokeWidth={Math.max(0.6, 2.5 * near)}
+                  strokeWidth="2.5"
                 />
-                {node?.root && (
+                {info?.root && (
                   <circle
-                    cx={item.point.x}
-                    cy={item.point.y}
-                    r={Math.max(2.4, nodeRadius + 5)}
+                    cx={node.x}
+                    cy={node.y}
+                    r={nodeRadius + 5}
                     fill="none"
                     stroke="#f6e05e"
-                    strokeWidth={Math.max(0.8, 1.6 * near)}
+                    strokeWidth="1.6"
                     opacity=".7"
                   />
                 )}
                 {isHead && (
                   <circle
-                    cx={item.point.x}
-                    cy={item.point.y}
-                    r={Math.max(2.4, nodeRadius + 8)}
+                    cx={node.x}
+                    cy={node.y}
+                    r={nodeRadius + 8}
                     fill="none"
                     stroke="#63b3ed"
-                    strokeWidth={Math.max(0.8, 1.6 * near)}
+                    strokeWidth="1.6"
                     opacity=".6"
                   />
                 )}
-                {(active || near > 0.85) && (
+                {(active || camera.k > 0.75) && (
                   <text
-                    x={item.point.x}
-                    y={item.point.y + nodeRadius + 14}
+                    x={node.x}
+                    y={node.y + nodeRadius + 14}
                     textAnchor="middle"
                     fontSize={active ? '11' : '9'}
-                    fill={
-                      active ? 'rgba(255,255,255,.92)' : `rgba(255,255,255,${(near - 0.5) * 1.2})`
-                    }
+                    fill={active ? 'rgba(255,255,255,.92)' : 'rgba(255,255,255,.6)'}
                   >
-                    {node ? `#${node.ordinal} ` : ''}
-                    {item.commit.shortHash}
+                    #{info?.ordinal} {commit.shortHash}
                   </text>
                 )}
-                {node?.root && near > 0.7 && (
+                {info?.root && camera.k > 0.9 && (
                   <text
-                    x={item.point.x}
-                    y={item.point.y - nodeRadius - 18}
+                    x={node.x}
+                    y={node.y - nodeRadius - 18}
                     textAnchor="middle"
                     fontSize="8"
                     fill="#f6e05e"
@@ -700,20 +730,21 @@ function Orbit({
                     first
                   </text>
                 )}
-                {item.commit.refs.length > 0 && (
+                {commit.refs.length > 0 && (active || camera.k > 1.1) && (
                   <text
-                    x={item.point.x}
-                    y={item.point.y - nodeRadius - 9}
+                    x={node.x}
+                    y={node.y - nodeRadius - 9}
                     textAnchor="middle"
                     fontSize="8"
                     fill="#4fd1c5"
                   >
-                    {item.commit.refs[0].slice(0, 24)}
+                    {commit.refs[0].slice(0, 24)}
                   </text>
                 )}
               </g>
             );
           })}
+        </g>
       </svg>
       {hovered && selected?.hash !== hovered.hash && (
         <div className="pointer-events-none absolute bottom-4 left-4 max-w-sm rounded-xl border border-lilac/25 bg-[#0b1020]/95 p-3 shadow-2xl">

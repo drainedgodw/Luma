@@ -1,5 +1,5 @@
 pkgbase = luma-bin
-	pkgdesc = Visual Git-first IDE with 3D commit graph, interactive rebase, and built-in editor
+	pkgdesc = Visual Git-first IDE with a commit web, interactive rebase, and built-in editor
 	pkgver = 0.1.0
 	pkgrel = 1
 	url = https://github.com/drainedgodw/Luma

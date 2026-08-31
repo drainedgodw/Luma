@@ -59,19 +59,17 @@ To come back to this screen later and pick another folder, press the **⌂** but
 **History** shows the commit graph in two modes (toggle in the section header):
 
 - **Lanes** — the classic vertical commit lanes.
-- **Orbit** — the same commits as a 3-D constellation. Newest commits sit at the center, older ones spiral outward.
+- **Orbit** — the same commits as a flat web, Obsidian-style: parents and children pull together, everything else pushes apart. Newest commits start near the center.
 
-In Orbit you have full camera control:
+In Orbit:
 
 | Action | Result |
 | --- | --- |
-| Drag | Rotate left/right and tilt up/down |
-| Shift-drag or right-drag | Pan |
-| Mouse wheel | Zoom |
-| ⟲ ⟳ | Rotate left / right |
-| ↘ ↗ | Tilt down / up |
-| ◐ | Auto-spin on/off |
-| Fit | Reset the camera |
+| Drag | Pan |
+| Mouse wheel | Zoom to the cursor |
+| Drag a commit | Move it — the web follows |
+| − / + | Zoom out / in |
+| Fit | Fit the whole history on screen |
 
 In both modes: **↑ ↓** moves between commits, **Enter** opens details, and clicking a commit shows its message, metadata, risk score, and full diff with the same rollback actions available everywhere else.
 
@@ -147,4 +145,4 @@ The GitHub section connects to your account (credentials are stored locally in y
 
 ---
 
-Enjoy the constellation. ✨
+Enjoy the web. 🕸
