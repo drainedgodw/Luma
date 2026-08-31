@@ -10,6 +10,10 @@ All notable changes are documented here. Luma follows semantic versioning once s
 - Defined experimental maturity labels for preview, Risk Map, language tools and Capsules.
 - Added AppImage extraction and credential guidance.
 
+### Build tooling
+
+- The bootstrap now downloads a private standalone CPython 3.11 toolchain into `.luma/` whenever the system Python lacks `distutils` (removed in Python 3.12), fixing the `node-pty` native build on current Arch, Fedora and similar distributions without touching the system Python.
+
 ## [0.1.0-alpha.1] - Planned
 
 ### Added

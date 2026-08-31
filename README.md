@@ -39,7 +39,7 @@ cd Luma
 bash scripts/bootstrap.sh dev
 ```
 
-The bootstrap downloads a private, compatible Node 22 into the ignored `.luma/` directory — it does not touch your system Node or shell config. See `bash scripts/bootstrap.sh --help` for test/build/clean commands.
+The bootstrap downloads a private, compatible Node 22 and a private CPython 3.11 (for the node-pty native build) into the ignored `.luma/` directory — it does not touch your system Node, Python or shell config. See `bash scripts/bootstrap.sh --help` for test/build/clean commands.
 
 ## Features
 
@@ -70,7 +70,7 @@ Full walkthrough: [docs/USERGUIDE.md](docs/USERGUIDE.md).
 ![Start screen](docs/screenshots/login.png)
 
 **Setup** — per-repository settings, including theme choice.
-![Setup](docs/screenshots/setup.png)
+![Setup screen](docs/screenshots/setup.png)
 
 **Code** — the editor with tabs, file explorer, status line and syntax highlighting.
 ![Code](docs/screenshots/code.png)
