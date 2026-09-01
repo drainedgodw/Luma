@@ -1,7 +1,7 @@
 {
   "name": "luma",
   "productName": "Luma",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Luma — a visual Git-first IDE for Linux. See your history, stage by drag & drop, resolve conflicts visually.",
   "main": "out/main/index.js",
   "license": "MIT",

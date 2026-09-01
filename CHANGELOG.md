@@ -2,7 +2,7 @@
 
 All notable changes are documented here. Luma follows semantic versioning once stable; `0.x` releases may change behavior between prereleases.
 
-## [Unreleased]
+## [0.1.1] - 2026-09-01
 
 ### Added
 
