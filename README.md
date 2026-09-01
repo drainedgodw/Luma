@@ -50,7 +50,7 @@ The bootstrap downloads a private, compatible Node 22 and a private CPython 3.11
 
 ## Features
 
-- **History** — commit graph in two views: classic Lanes and an interactive Orbit web (drag to pan, wheel to zoom)
+- **History** — commit graph in two views: classic Lanes and an interactive Orbit web (drag to pan, wheel to zoom, hover traces the branch)
 - **Changes** — staging by drag & drop, diffs, conflict resolution, commit messages with a template history
 - **Visual rebase** — reorder, squash, fixup, reword and drop commits; cherry-pick, revert, tags, merge strategy choice
 - **Safety net** — Secret Guard scans staged additions, every rollback creates a checkpoint branch, Rescue browses the reflog, bisect and stash included
@@ -71,38 +71,6 @@ The bootstrap downloads a private, compatible Node 22 and a private CPython 3.11
 - Ctrl + `` ` `` — terminal
 
 Full walkthrough: [docs/USERGUIDE.md](docs/USERGUIDE.md).
-
-## Screenshots
-
-**Start** — directory picker with recent folders and keyboard navigation. Luma is an IDE first: any folder opens, Git is optional.
-![Start screen](docs/screenshots/login.png)
-
-**Setup** — per-repository settings, including theme choice.
-![Setup screen](docs/screenshots/setup.png)
-
-**Code** — the editor with tabs, file explorer, status line and syntax highlighting.
-![Code](docs/screenshots/code.png)
-
-**Changes** — unstaged/staged files, drag & drop staging, diff view and commit box.
-![Changes](docs/screenshots/changes.png)
-
-**History — Lanes** — the classic commit graph with branch lanes, commit details and actions.
-![History lanes](docs/screenshots/history_lanes.png)
-
-**History — Orbit** — the same history as an Obsidian-style web of commits; drag to pan, wheel to zoom, drag a commit to place it.
-![History orbit](docs/screenshots/history_orbit.png)
-
-**GitHub** — connect a token or SSH key, then clone, fetch, pull and push without leaving the app.
-![GitHub](docs/screenshots/GitHub.png)
-
-**Tools** — bisect, stash, reflog Rescue and other recovery operations in one place.
-![Tools](docs/screenshots/Tools.png)
-
-**Stack (Languages & Ecosystem)** — detected runtimes, project dependencies and one-click installs of packages and frameworks.
-![Stack](docs/screenshots/stack.png)
-
-**Rescue** — reflog browser: every move of HEAD is recoverable, with checkpoint branches from rollbacks.
-![Rescue](docs/screenshots/rescue.png)
 
 ## Project structure
 
@@ -125,3 +93,35 @@ tests/          parser, Git integration, security and recovery tests
 ## License
 
 [MIT](LICENSE)
+
+## Screenshots
+
+**Start** — open any directory, or jump back into a recent one. Luma is an editor first; Git initializes when you ask for it.
+![Start screen](docs/screenshots/login.png)
+
+**Code** — the editor: tabs, per-file Reload / Save / History / Stage, and a status line with position, indent and encoding. This is where most of the time goes.
+![Code](docs/screenshots/code.png)
+
+**Changes** — the working tree and the commit container: stage with + or by dragging a file in, write the message, commit or stash.
+![Changes](docs/screenshots/changes.png)
+
+**History — Lanes** — the commit list with ordinals, authors, tags and branch refs. ↑ ↓ navigate, Enter opens a commit.
+![History lanes](docs/screenshots/history_lanes.png)
+
+**History — Orbit** — the same repository as a flat, Obsidian-style web: nodes never overlap, hovering traces the branch while the rest of the web fades, clicking a commit opens its diff and rollback actions.
+![History orbit](docs/screenshots/history_orbit.png)
+
+**GitHub** — connect a fine-grained token (validated with GitHub, encrypted via Electron safeStorage, never written into remotes or logs), then clone and open repositories without leaving Luma.
+![GitHub](docs/screenshots/GitHub.png)
+
+**Tools** — workspace trust, detected project tasks, a read-only Git operation preview and workspace snapshots.
+![Tools](docs/screenshots/Tools.png)
+
+**Rescue** — every move HEAD ever made; here a fresh clone and the first pull. Any moment is one click away.
+![Rescue](docs/screenshots/rescue.png)
+
+**Stack** — the runtimes actually installed on the machine (Java and C# are missing here) and the project manifest that was detected.
+![Stack](docs/screenshots/stack.png)
+
+**Settings** — editor, Git behavior, themes and the anonymous update check. This install runs the current 0.1.1.
+![Settings](docs/screenshots/setup.png)
