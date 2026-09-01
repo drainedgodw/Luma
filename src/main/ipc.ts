@@ -1,442 +1,473 @@
-import { BrowserWindow, app, dialog, ipcMain } from 'electron';
+import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron';
 import { promises as fs, readFileSync } from 'node:fs';
-import { join, normalize, resolve } from 'node:path';
+import { join } from 'node:path';
 import * as engine from './git/engine';
-import { invalidateStatusCache, runGit } from './git/exec';
-import { parseDiffNameStatus, parseGitStatus, parseNumstat } from './git/parse';
-import { isPathSafe, validateMessage } from './pathGuard';
-import { scanStagedContent } from './secretGuard';
-import { startTerminal, writeTerminal, resizeTerminal, killTerminal } from './terminal';
-import { listFileHistory, readFileVersion } from './fileHistory';
-import { appendTemplate, listTemplates } from './recentRepos';
-
-type GetWindow = () => BrowserWindow | null;
-type Result<T> = { ok: true; data: T } | { ok: false; error: { message: string; stderr: string } };
-
-const pendingTemplates = new WeakMap<BrowserWindow, string>();
-
-type RepoWindow = BrowserWindow & { __repo?: string };
-function currentRepo(getWindow: GetWindow): string {
-  const repo = (getWindow() as RepoWindow | null)?.__repo;
-  if (!repo) throw new Error('No repository open');
-  return repo;
-}
-
-async function wrap<T>(fn: () => Promise<T>): Promise<Result<T>> {
-  try {
-    return { ok: true, data: await fn() };
-  } catch (error) {
-    const err = error as Error & { stderr?: string };
-    return { ok: false, error: { message: err.message, stderr: err.stderr ?? '' } };
-  }
-}
-
-function throwOnHook(output: string) {
-  if (/(^|\n).{0,80}hook/i.test(output)) {
-    throw new Error(
-      'A Git hook modified or blocked this operation. Luma does not run hooks; review the hook output in the Commands log.'
-    );
-  }
-}
-
-export function registerIpc(getWindow: GetWindow): void {
-  const on = (channel: string, handler: (...a: any[]) => Promise<unknown> | unknown) => {
-    ipcMain.handle(channel, async (_event, ...args) => {
-      try {
-        return await handler(...args);
-      } catch (error) {
-        const err = error as Error & { stderr?: string };
-        return { ok: false, error: { message: err.message, stderr: err.stderr ?? '' } };
-      }
-    });
+import { tryGit } from './git/exec';
+import { registerTerminal } from './terminal';
+import { snapshot as snapFile, listSnapshots, getSnapshot } from './fileHistory';
+import { assertParentInRepo, resolveExistingRepoPath, resolveRepoPath } from './pathGuard';
+export function registerIpc(getWindow: () => BrowserWindow | null) {
+  const repo = () => {
+    const w = getWindow();
+    return w ? ((w as BrowserWindow & { __repo?: string }).__repo ?? null) : null;
   };
-
-  on('repo:open', async () => {
-    const win = getWindow();
-    if (!win) throw new Error('no window');
-    const result = await dialog.showOpenDialog(win, {
-      properties: ['openDirectory', 'createDirectory'],
+  const needRepo = () => {
+    const r = repo();
+    if (!r) throw new Error('No repository open');
+    return r;
+  };
+  const emit = (c: string, p: unknown) => getWindow()?.webContents.send(c, p);
+  let cmdId = 0;
+  const wrap = async (command: string, fn: () => Promise<unknown>) => {
+    emit('git:command', { id: ++cmdId, command, at: Date.now() });
+    try {
+      return { ok: true, data: await fn() };
+    } catch (err) {
+      const e = err as { stderr?: string; message?: string };
+      return { ok: false, error: { message: e.message ?? String(err), stderr: e.stderr ?? '' } };
+    }
+  };
+  const on = (
+    channel: string,
+    commandFn: (...a: any[]) => string,
+    fn: (...a: any[]) => Promise<unknown>
+  ) => ipcMain.handle(channel, (_e, ...args) => wrap(commandFn(...args), () => fn(...args)));
+  const safeName = (n: string) => {
+    if (!n || n === '.' || n === '..' || /[\\/\0]/.test(n)) throw new Error('Invalid file name');
+    return n;
+  };
+  const validatePaths = (r: string, paths: string[]) => {
+    for (const p of paths) resolveRepoPath(r, p, false);
+    return paths;
+  };
+  ipcMain.handle('repo:open', async () => {
+    const x = await dialog.showOpenDialog(getWindow()!, { properties: ['openDirectory'] });
+    if (x.canceled || !x.filePaths.length)
+      return { ok: false, error: { message: 'canceled', stderr: '' } };
+    const dir = x.filePaths[0];
+    if (!(await engine.isRepo(dir)))
+      return { ok: false, error: { message: `Not a git repository: ${dir}`, stderr: '' } };
+    (getWindow() as BrowserWindow & { __repo?: string }).__repo = dir;
+    return { ok: true, data: dir };
+  });
+  ipcMain.handle('repo:path', () => repo());
+  ipcMain.handle('repo:last', () => {
+    try {
+      return JSON.parse(
+        readFileSync(join(app.getPath('userData'), 'recent.json'), 'utf8')
+      ) as string[];
+    } catch {
+      return [];
+    }
+  });
+  ipcMain.handle('repo:openPath', async (_e, dir: string) => {
+    if (!(await engine.isRepo(dir)))
+      return { ok: false, error: { message: 'Not a git repository', stderr: '' } };
+    (getWindow() as BrowserWindow & { __repo?: string }).__repo = dir;
+    const recent = JSON.parse(
+      await fs.readFile(join(app.getPath('userData'), 'recent.json'), 'utf8').catch(() => '[]')
+    );
+    const next = [dir, ...recent.filter((d: string) => d !== dir)].slice(0, 10);
+    await fs.mkdir(app.getPath('userData'), { recursive: true });
+    await fs.writeFile(join(app.getPath('userData'), 'recent.json'), JSON.stringify(next), {
+      mode: 0o600,
     });
-    if (result.canceled || !result.filePaths[0]) return { ok: false, error: { message: 'canceled', stderr: '' } };
-    (win as RepoWindow).__repo = result.filePaths[0];
-    return { ok: true, data: { path: result.filePaths[0] } };
+    return { ok: true, data: dir };
   });
-
-  on('repo:openPath', async (path: string) => {
-    const win = getWindow() as RepoWindow | null;
-    if (!win) throw new Error('no window');
-    const abs = resolve(String(path));
-    const stat = await fs.stat(abs).catch(() => null);
-    if (!stat?.isDirectory()) throw new Error('Not a directory: ' + abs);
-    win.__repo = abs;
-    return { ok: true, data: { path: abs } };
-  });
-
-  on('repo:last', async () => {
-    const file = join(app.getPath('userData'), 'session.json');
+  on(
+    'git:log',
+    () => `git log --all --oneline`,
+    () => engine.getLog(needRepo())
+  );
+  on(
+    'git:refs',
+    () => `git for-each-ref`,
+    () => engine.getRefs(needRepo())
+  );
+  on(
+    'git:status',
+    () => `git status`,
+    () => engine.getStatus(needRepo())
+  );
+  on(
+    'git:diff',
+    (s: boolean, p?: string) => `git diff${s ? ' --cached' : ''}${p ? ' -- ' + p : ''}`,
+    (s, p) => {
+      const r = needRepo();
+      if (p) resolveRepoPath(r, p, false);
+      return engine.getDiff(r, s, p);
+    }
+  );
+  on(
+    'git:commitDiff',
+    (h: string) => `git show ${h}`,
+    (h) => engine.getCommitDiff(needRepo(), h)
+  );
+  on(
+    'git:stage',
+    (p: string[]) => `git add ${p.join(' ')}`,
+    (p) => {
+      const r = needRepo();
+      return engine.stage(r, validatePaths(r, p));
+    }
+  );
+  on(
+    'git:stageAll',
+    () => `git add -A`,
+    () => engine.stageAll(needRepo())
+  );
+  on(
+    'git:unstage',
+    (p: string[]) => `git restore --staged ${p.join(' ')}`,
+    (p) => {
+      const r = needRepo();
+      return engine.unstage(r, validatePaths(r, p));
+    }
+  );
+  on(
+    'git:discard',
+    (p: string[]) => `git checkout -- ${p.join(' ')}`,
+    (p) => {
+      const r = needRepo();
+      return engine.discard(r, validatePaths(r, p));
+    }
+  );
+  on(
+    'git:commit',
+    () => `git commit -m "..."`,
+    (m) => engine.commit(needRepo(), m)
+  );
+  on(
+    'git:amend',
+    () => `git commit --amend`,
+    (m) => engine.amend(needRepo(), m)
+  );
+  on(
+    'git:branch',
+    (n: string, f?: string) => `git branch ${n}${f ? ' ' + f : ''}`,
+    (n, f) => engine.createBranch(needRepo(), n, f)
+  );
+  on(
+    'git:checkout',
+    (r: string, c?: string) => `git checkout${c ? ' -b ' + c : ''} ${r}`,
+    (r, c) => engine.checkout(needRepo(), r, c)
+  );
+  on(
+    'git:deleteBranch',
+    (n: string) => `git branch -d ${n}`,
+    (n, f) => engine.deleteBranch(needRepo(), n, f)
+  );
+  on(
+    'git:merge',
+    (r: string, n: boolean, f: boolean) =>
+      `git merge${n ? ' --no-ff' : ''}${f ? ' --ff-only' : ''} ${r}`,
+    (r, n, f) => engine.merge(needRepo(), r, n, f)
+  );
+  on(
+    'git:mergeAbort',
+    () => `git merge --abort`,
+    () => engine.abortMerge(needRepo())
+  );
+  on(
+    'git:rebase',
+    (o: string) => `git rebase ${o}`,
+    (o) => engine.rebase(needRepo(), o)
+  );
+  on(
+    'git:rebaseContinue',
+    () => `git rebase --continue`,
+    () => engine.continueRebase(needRepo())
+  );
+  on(
+    'git:rebaseAbort',
+    () => `git rebase --abort`,
+    () => engine.abortRebase(needRepo())
+  );
+  on(
+    'git:fetch',
+    (r: string) => `git fetch --prune ${r}`,
+    (r) => engine.fetchRemotes(needRepo(), r)
+  );
+  on(
+    'git:push',
+    () => `git push`,
+    (u) => engine.push(needRepo(), u)
+  );
+  on(
+    'git:pull',
+    () => `git pull --rebase`,
+    () => engine.pull(needRepo())
+  );
+  on(
+    'git:bisectStart',
+    (b: string, g?: string) => `git bisect start ${b} ${g ?? ''}`.trim(),
+    (b, g) => engine.bisectStart(needRepo(), b, g)
+  );
+  on(
+    'git:bisectMark',
+    (g: boolean) => `git bisect ${g ? 'good' : 'bad'}`,
+    (g) => engine.bisectMark(needRepo(), g)
+  );
+  on(
+    'git:bisectReset',
+    () => `git bisect reset`,
+    () => engine.bisectReset(needRepo())
+  );
+  on(
+    'git:bisectState',
+    () => `git bisect log`,
+    () => engine.bisectState(needRepo())
+  );
+  on(
+    'git:conflictFile',
+    (p: string) => `git show conflict ${p}`,
+    (p) => {
+      const r = needRepo();
+      resolveRepoPath(r, p, false);
+      return engine.getConflictFile(r, p);
+    }
+  );
+  on(
+    'git:resolveConflict',
+    (p: string) => `write ${p}; git add ${p}`,
+    (p, c, t) => {
+      const r = needRepo();
+      resolveRepoPath(r, p, false);
+      return engine.resolveConflict(r, p, c, t);
+    }
+  );
+  on(
+    'git:remotes',
+    () => `git remote`,
+    () => engine.getRemotes(needRepo())
+  );
+  on(
+    'git:stashPush',
+    () => `git stash push`,
+    (m) => engine.stashPush(needRepo(), m)
+  );
+  on(
+    'git:stashPop',
+    (r?: string) => `git stash pop ${r ?? ''}`.trim(),
+    (r) => engine.stashPop(needRepo(), r)
+  );
+  on(
+    'git:stashApply',
+    (r: string) => `git stash apply ${r}`,
+    (r) => engine.stashApply(needRepo(), r)
+  );
+  on(
+    'git:stashDrop',
+    (r: string) => `git stash drop ${r}`,
+    (r) => engine.stashDrop(needRepo(), r)
+  );
+  on(
+    'git:stashList',
+    () => `git stash list`,
+    () => engine.stashList(needRepo())
+  );
+  on(
+    'git:reflog',
+    () => `git reflog`,
+    () => engine.reflog(needRepo())
+  );
+  on(
+    'git:rewindHard',
+    (r: string) => `git reset --hard ${r}`,
+    (r) => engine.rewindHard(needRepo(), r)
+  );
+  on(
+    'git:rewindSoft',
+    (r: string) => `git reset --soft ${r}`,
+    (r) => engine.rewindSoft(needRepo(), r)
+  );
+  on(
+    'git:cherryPick',
+    (h: string) => `git cherry-pick ${h}`,
+    (h) => engine.cherryPick(needRepo(), h)
+  );
+  on(
+    'git:revert',
+    (h: string) => `git revert --no-edit ${h}`,
+    (h) => engine.revertCommit(needRepo(), h)
+  );
+  on(
+    'git:createTag',
+    (n: string, h?: string, m?: string) => `git tag ${m ? '-a ' : ''}${n}`,
+    (n, h, m) => engine.createTag(needRepo(), n, h, m)
+  );
+  on(
+    'git:deleteTag',
+    (n: string) => `git tag -d ${n}`,
+    (n) => engine.deleteTag(needRepo(), n)
+  );
+  on(
+    'git:commitRange',
+    (f: string, t: string) => `git log ${f}..${t}`,
+    (f, t) => engine.getCommitRange(needRepo(), f, t)
+  );
+  on(
+    'git:rebaseTodo',
+    () => `git rebase --show-todo`,
+    () => engine.getRebaseTodo(needRepo())
+  );
+  on(
+    'git:interactiveRebase',
+    (b: string) => `git rebase -i ${b}`,
+    (b, t) => engine.startInteractiveRebase(needRepo(), b, t)
+  );
+  on(
+    'git:mainBranch',
+    () => `git symbolic-ref refs/remotes/origin/HEAD`,
+    () => engine.getMainBranch(needRepo())
+  );
+  on(
+    'git:bridges',
+    (b: string) => `git rev-list --left-right --count ${b}...`,
+    (b) => engine.listBranchBridges(needRepo(), b)
+  );
+  on(
+    'git:remoteUrl',
+    () => `git remote get-url origin`,
+    () => engine.getRemoteUrl(needRepo())
+  );
+  ipcMain.handle('fs:read', async (_e, p: string) => {
     try {
-      const cached = readFileSync(file, 'utf8');
-      return JSON.parse(cached);
-    } catch {
-      return null;
+      const r = needRepo();
+      const target = await resolveExistingRepoPath(r, p, false);
+      return { ok: true, data: await fs.readFile(target, 'utf8') };
+    } catch (e) {
+      return { ok: false, error: { message: String(e), stderr: '' } };
     }
   });
-
-  on('git:log', async (limit = 400) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      if (!(await engine.isRepo(repo))) return [];
-      return engine.log(repo, Number(limit) || 400);
-    })
-  );
-
-  on('git:status', () => wrap(() => engine.status(currentRepo(getWindow))));
-
-  on('git:commitDiff', (hash: string) =>
-    wrap(() => engine.commitDiff(currentRepo(getWindow), String(hash)))
-  );
-
-  on('git:worktreeDiff', () => wrap(() => engine.worktreeDiff(currentRepo(getWindow))));
-
-  on('git:stage', (paths: string[]) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      for (const p of paths) if (!isPathSafe(String(p))) throw new Error('unsafe path: ' + p);
-      await runGit(repo, ['add', '--', ...paths.map(String)]);
-      invalidateStatusCache(repo);
-      return engine.status(repo);
-    })
-  );
-
-  on('git:unstage', (paths: string[]) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      for (const p of paths) if (!isPathSafe(String(p))) throw new Error('unsafe path: ' + p);
-      await runGit(repo, ['restore', '--staged', '--', ...paths.map(String)]);
-      invalidateStatusCache(repo);
-      return engine.status(repo);
-    })
-  );
-
-  on('git:commit', (message: string) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      validateMessage(String(message));
-      const status = await engine.status(repo);
-      const staged = status.entries.filter((e) => e.staged);
-      if (!staged.length) throw new Error('Nothing staged to commit.');
-      const diff = await runGit(repo, ['diff', '--cached', '-U0']);
-      const findings = scanStagedContent(diff.split('\n'), []);
-      if (findings.length) {
-        const names = [...new Set(findings.map((f) => f.kind))].join(', ');
-        throw new Error(`Secret Guard blocked the commit: possible ${names}. Unstage or edit the flagged lines, or use --no-verify intentionally from the CLI.`);
-      }
-      const out = await runGit(repo, ['commit', '-m', String(message)]);
-      throwOnHook(out.stderr + out.stdout);
-      invalidateStatusCache(repo);
-      return engine.status(repo);
-    })
-  );
-
-  on('git:checkout', (ref: string, createBranch?: string) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      const args = createBranch ? ['checkout', '-b', String(createBranch), String(ref)] : ['checkout', String(ref)];
-      const out = await runGit(repo, args);
-      throwOnHook(out.stderr + out.stdout);
-      invalidateStatusCache(repo);
-      return engine.status(repo);
-    })
-  );
-
-  on('git:merge', (branch: string, noFf: boolean, ffOnly: boolean) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      const args = ['merge'];
-      if (noFf) args.push('--no-ff');
-      if (ffOnly) args.push('--ff-only');
-      args.push(String(branch));
-      const out = await runGit(repo, args, { allowExitCodes: [0, 1] });
-      throwOnHook(out.stderr + out.stdout);
-      invalidateStatusCache(repo);
-      return { status: await engine.status(repo), stderr: out.stderr };
-    })
-  );
-
-  on('git:rebase', (onto: string) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      const out = await runGit(repo, ['rebase', String(onto)], { allowExitCodes: [0, 1] });
-      throwOnHook(out.stderr + out.stdout);
-      invalidateStatusCache(repo);
-      return { status: await engine.status(repo), stderr: out.stderr };
-    })
-  );
-
-  on('git:rebaseContinue', () =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      const out = await runGit(repo, ['-c', 'core.editor=true', 'rebase', '--continue'], {
-        allowExitCodes: [0, 1],
-      });
-      invalidateStatusCache(repo);
-      return { status: await engine.status(repo), stderr: out.stderr };
-    })
-  );
-
-  on('git:rebaseAbort', () =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      await runGit(repo, ['rebase', '--abort']);
-      invalidateStatusCache(repo);
-      return engine.status(repo);
-    })
-  );
-
-  on('git:rebaseInteractive', (base: string, ops: { hash: string; action: string; message?: string }[]) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      return engine.interactiveRebase(repo, String(base), ops);
-    })
-  );
-
-  on('git:cherryPick', (hash: string) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      const out = await runGit(repo, ['cherry-pick', String(hash)], { allowExitCodes: [0, 1] });
-      invalidateStatusCache(repo);
-      return { status: await engine.status(repo), stderr: out.stderr };
-    })
-  );
-
-  on('git:revert', (hash: string) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      const out = await runGit(repo, ['revert', '--no-edit', String(hash)], { allowExitCodes: [0, 1] });
-      invalidateStatusCache(repo);
-      return { status: await engine.status(repo), stderr: out.stderr };
-    })
-  );
-
-  on('git:tag', (name: string, ref: string) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      await runGit(repo, ['tag', String(name), String(ref)]);
-      return engine.status(repo);
-    })
-  );
-
-  on('git:rewindSoft', (ref: string) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      await engine.createCheckpointBranch(repo, 'soft-rewind');
-      await runGit(repo, ['reset', '--soft', String(ref)]);
-      invalidateStatusCache(repo);
-      return engine.status(repo);
-    })
-  );
-
-  on('git:rewindHard', (ref: string) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      const status = await engine.status(repo);
-      const dirty = status.entries.length > 0;
-      if (dirty) {
-        await runGit(repo, ['stash', 'push', '-u', '-m', 'luma-safety-stash']);
-      }
-      await engine.createCheckpointBranch(repo, 'hard-rewind');
-      await runGit(repo, ['reset', '--hard', String(ref)]);
-      invalidateStatusCache(repo);
-      return { status: await engine.status(repo), stashed: dirty };
-    })
-  );
-
-  on('git:bisectStart', (good: string, bad: string) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      await runGit(repo, ['bisect', 'start']);
-      await runGit(repo, ['bisect', 'bad', String(bad)]);
-      const out = await runGit(repo, ['bisect', 'good', String(good)]);
-      invalidateStatusCache(repo);
-      return { status: await engine.status(repo), stderr: out.stderr };
-    })
-  );
-
-  on('git:bisectMark', (good: boolean) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      const out = await runGit(repo, ['bisect', good ? 'good' : 'bad'], { allowExitCodes: [0, 1] });
-      invalidateStatusCache(repo);
-      return { status: await engine.status(repo), stderr: out.stderr };
-    })
-  );
-
-  on('git:bisectReset', () =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      await runGit(repo, ['bisect', 'reset']);
-      invalidateStatusCache(repo);
-      return engine.status(repo);
-    })
-  );
-
-  on('git:reflog', () => wrap(() => engine.reflog(currentRepo(getWindow))));
-
-  on('git:stashList', () => wrap(() => engine.stashList(currentRepo(getWindow))));
-
-  on('git:stashPush', (message: string) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      const args = ['stash', 'push', '-u'];
-      if (message) args.push('-m', String(message));
-      await runGit(repo, args);
-      invalidateStatusCache(repo);
-      return engine.status(repo);
-    })
-  );
-
-  on('git:stashPop', (index: number) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      const out = await runGit(repo, ['stash', 'pop', `stash@{${Number(index) || 0}}`], {
-        allowExitCodes: [0, 1],
-      });
-      invalidateStatusCache(repo);
-      return { status: await engine.status(repo), stderr: out.stderr };
-    })
-  );
-
-  on('git:conflicts', () =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      const statusOut = await runGit(repo, ['status', '--porcelain=v1', '-z']);
-      const parsed = parseGitStatus(statusOut.stdout);
-      const conflicted = parsed.entries.filter((e) => e.conflicted);
-      const files = [];
-      for (const entry of conflicted) {
-        files.push(await engine.conflictFile(repo, entry.path));
-      }
-      return files;
-    })
-  );
-
-  on('git:resolveConflict', (path: string, content: string) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      if (!isPathSafe(String(path))) throw new Error('unsafe path');
-      const absolute = join(repo, String(path));
-      const relativeCheck = normalize(absolute).startsWith(normalize(repo));
-      if (!relativeCheck) throw new Error('path escapes repository');
-      await fs.writeFile(absolute, String(content), 'utf8');
-      await runGit(repo, ['add', '--', String(path)]);
-      invalidateStatusCache(repo);
-      return engine.status(repo);
-    })
-  );
-
-  on('fs:readFile', async (path: string) => {
-    const repo = currentRepo(getWindow);
-    const absolute = join(repo, String(path));
-    if (!normalize(absolute).startsWith(normalize(repo))) throw new Error('path escapes repository');
-    return fs.readFile(absolute, 'utf8');
-  });
-
-  on('fs:writeFile', async (path: string, content: string) => {
-    const repo = currentRepo(getWindow);
-    if (!isPathSafe(String(path))) throw new Error('unsafe path');
-    const absolute = join(repo, String(path));
-    if (!normalize(absolute).startsWith(normalize(repo))) throw new Error('path escapes repository');
-    await fs.writeFile(absolute, String(content), 'utf8');
-    invalidateStatusCache(repo);
-    return true;
-  });
-
-  on('fs:list', async (dir: string) => {
-    const repo = currentRepo(getWindow);
-    const absolute = join(repo, String(dir));
-    if (!normalize(absolute).startsWith(normalize(repo))) throw new Error('path escapes repository');
-    const entries = await fs.readdir(absolute, { withFileTypes: true });
-    return entries.map((e) => ({ name: e.name, dir: e.isDirectory() }));
-  });
-
-  on('file:history', (path: string) =>
-    wrap(() => listFileHistory(currentRepo(getWindow), String(path)))
-  );
-
-  on('file:version', (path: string, commitHash: string) =>
-    wrap(() => readFileVersion(currentRepo(getWindow), String(path), String(commitHash)))
-  );
-
-  on('templates:list', () => wrap(() => listTemplates(currentRepo(getWindow))));
-
-  on('templates:remember', (message: string) =>
-    wrap(() => appendTemplate(currentRepo(getWindow), String(message)))
-  );
-
-  on('git:trustQuery', async () => {
-    const repo = (getWindow() as RepoWindow | null)?.__repo;
-    if (!repo) return false;
-    const file = join(app.getPath('userData'), 'trusted.json');
+  ipcMain.handle('fs:write', async (_e, p: string, content: string) => {
     try {
-      const list = JSON.parse(await fs.readFile(file, 'utf8')) as string[];
-      return list.includes(repo);
-    } catch {
-      return false;
+      const r = needRepo();
+      const target = resolveRepoPath(r, p, false);
+      await assertParentInRepo(r, target);
+      await fs.writeFile(target, content);
+      await snapFile(r, p, content);
+      return { ok: true, data: null };
+    } catch (e) {
+      return { ok: false, error: { message: String(e), stderr: '' } };
     }
   });
-
-  on('git:trustGrant', async () => {
-    const repo = currentRepo(getWindow);
-    const file = join(app.getPath('userData'), 'trusted.json');
-    let list: string[] = [];
+  ipcMain.handle('history:list', async (_e, p: string) => {
     try {
-      list = JSON.parse(await fs.readFile(file, 'utf8')) as string[];
-    } catch {}
-    if (!list.includes(repo)) list.push(repo);
-    await fs.writeFile(file, JSON.stringify(list), 'utf8');
-    return true;
+      resolveRepoPath(needRepo(), p, false);
+      return { ok: true, data: await listSnapshots(needRepo(), p) };
+    } catch (e) {
+      return { ok: false, error: { message: String(e), stderr: '' } };
+    }
   });
-
-  on('terminal:create', (id: string, cwd: string) => {
-    const win = getWindow();
-    if (!win) throw new Error('no window');
-    startTerminal(String(id), String(cwd), win.webContents);
+  ipcMain.handle('history:get', async (_e, p: string, ts: number) => {
+    try {
+      resolveRepoPath(needRepo(), p, false);
+      if (!Number.isSafeInteger(ts) || ts < 0) throw new Error('Invalid snapshot');
+      return { ok: true, data: await getSnapshot(needRepo(), p, ts) };
+    } catch (e) {
+      return { ok: false, error: { message: String(e), stderr: '' } };
+    }
   });
-  ipcMain.on('terminal:write', (_e, { id, data }: { id: string; data: string }) =>
-    writeTerminal(String(id), String(data))
-  );
-  ipcMain.on('terminal:resize', (_e, { id, cols, rows }: { id: string; cols: number; rows: number }) =>
-    resizeTerminal(String(id), Number(cols), Number(rows))
-  );
-  ipcMain.on('terminal:kill', (_e, { id }: { id: string }) => killTerminal(String(id)));
-
-  on('templates:pending', (message: string) => {
-    const win = getWindow();
-    if (win) pendingTemplates.set(win, String(message));
-    return true;
+  ipcMain.handle('fs:list', async (_e, p: string) => {
+    try {
+      const target = await resolveExistingRepoPath(needRepo(), p || '.');
+      const entries = await fs.readdir(target, { withFileTypes: true });
+      return {
+        ok: true,
+        data: entries
+          .filter((e) => e.name !== '.git')
+          .map((e) => ({ name: e.name, dir: e.isDirectory() }))
+          .sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1)),
+      };
+    } catch (e) {
+      return { ok: false, error: { message: String(e), stderr: '' } };
+    }
   });
-
-  on('templates:takePending', () => {
-    const win = getWindow();
-    if (!win) return null;
-    const value = pendingTemplates.get(win) ?? null;
-    pendingTemplates.delete(win);
-    return value;
+  ipcMain.handle('fs:newFile', async (_e, parent: string, name: string) => {
+    try {
+      const r = needRepo(),
+        target = resolveRepoPath(r, parent ? `${parent}/${safeName(name)}` : safeName(name), false);
+      await assertParentInRepo(r, target);
+      if (
+        await fs
+          .stat(target)
+          .then(() => true)
+          .catch(() => false)
+      )
+        throw new Error('Already exists');
+      await fs.writeFile(target, '');
+      return { ok: true, data: target };
+    } catch (e) {
+      return { ok: false, error: { message: String(e), stderr: '' } };
+    }
   });
-
-  on('git:numstat', (ref: string) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      const out = await runGit(repo, ['diff', '--numstat', `${String(ref)}..HEAD`]);
-      return parseNumstat(out.stdout);
-    })
-  );
-
-  on('git:nameStatus', (ref: string) =>
-    wrap(async () => {
-      const repo = currentRepo(getWindow);
-      const out = await runGit(repo, ['diff', '--name-status', `${String(ref)}..HEAD`]);
-      return parseDiffNameStatus(out.stdout);
-    })
-  );
+  ipcMain.handle('fs:newDir', async (_e, parent: string, name: string) => {
+    try {
+      const r = needRepo(),
+        target = resolveRepoPath(r, parent ? `${parent}/${safeName(name)}` : safeName(name), false);
+      await assertParentInRepo(r, target);
+      await fs.mkdir(target);
+      return { ok: true, data: target };
+    } catch (e) {
+      return { ok: false, error: { message: String(e), stderr: '' } };
+    }
+  });
+  ipcMain.handle('fs:rename', async (_e, path: string, newName: string) => {
+    const r = needRepo();
+    try {
+      const from = await resolveExistingRepoPath(r, path, false),
+        parent = path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : '',
+        relativeTo = parent ? `${parent}/${safeName(newName)}` : safeName(newName),
+        to = resolveRepoPath(r, relativeTo, false);
+      await assertParentInRepo(r, to);
+      const tracked = await tryGit(r, ['ls-files', '--error-unmatch', '--', path]);
+      if (tracked.code === 0) {
+        const mv = await tryGit(r, ['mv', '--', path, relativeTo]);
+        if (mv.code !== 0) throw new Error(mv.stderr);
+      } else await fs.rename(from, to);
+      return { ok: true, data: null };
+    } catch (e) {
+      return { ok: false, error: { message: String(e), stderr: '' } };
+    }
+  });
+  ipcMain.handle('fs:delete', async (_e, path: string, isDir: boolean) => {
+    const r = needRepo();
+    try {
+      const target = await resolveExistingRepoPath(r, path, false);
+      const tracked = await tryGit(r, ['ls-files', '--error-unmatch', '--', path]);
+      if (tracked.code === 0) {
+        const x = await tryGit(
+          r,
+          isDir ? ['rm', '-r', '-q', '--', path] : ['rm', '-q', '--', path]
+        );
+        if (x.code !== 0) throw new Error(x.stderr);
+      } else await fs.rm(target, { recursive: true, force: true });
+      return { ok: true, data: null };
+    } catch (e) {
+      return { ok: false, error: { message: String(e), stderr: '' } };
+    }
+  });
+  ipcMain.handle('fs:duplicate', async (_e, path: string) => {
+    try {
+      const r = needRepo(),
+        from = await resolveExistingRepoPath(r, path, false),
+        dot = path.lastIndexOf('.'),
+        copy = dot > 0 ? `${path.slice(0, dot)}-copy${path.slice(dot)}` : `${path}-copy`,
+        to = resolveRepoPath(r, copy, false);
+      await assertParentInRepo(r, to);
+      await fs.copyFile(from, to);
+      return { ok: true, data: copy };
+    } catch (e) {
+      return { ok: false, error: { message: String(e), stderr: '' } };
+    }
+  });
+  ipcMain.handle('shell:openExternal', async (_e, url: string) => {
+    if (typeof url === 'string' && /^https?:\/\//.test(url)) {
+      await shell.openExternal(url);
+      return { ok: true, data: null };
+    }
+    return { ok: false, error: { message: 'Invalid URL', stderr: '' } };
+  });
+  registerTerminal(getWindow, repo);
 }
