@@ -16,11 +16,17 @@ function newerThan(latest: string, current: string): boolean {
 }
 
 async function latestVersion(): Promise<string> {
-  const response = await fetch(VERSION_URL, { signal: AbortSignal.timeout(8000) });
-  if (!response.ok) throw new Error(`update check: HTTP ${response.status}`);
-  const data = (await response.json()) as { version?: string };
-  if (!data.version) throw new Error('update check: no version field');
-  return data.version;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(VERSION_URL, { signal: controller.signal });
+    if (!response.ok) throw new Error(`update check: HTTP ${response.status}`);
+    const data = (await response.json()) as { version?: string };
+    if (!data.version) throw new Error('update check: no version field');
+    return data.version;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export function registerUpdateIpc(): void {
