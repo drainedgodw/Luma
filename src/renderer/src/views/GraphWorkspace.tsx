@@ -382,6 +382,7 @@ function Orbit({
   const links = useRef<[OrbitNode, OrbitNode][]>([]);
   const frame = useRef(0);
   const alpha = useRef(0);
+  const hot = useRef(false);
   const [size, setSize] = useState({ width: 800, height: 600 });
   const [camera, setCamera] = useState<OrbitCamera>({ x: 0, y: 0, k: 1 });
   const [hovered, setHovered] = useState<LaidCommit | null>(null);
@@ -408,10 +409,22 @@ function Orbit({
     );
   }, [commits]);
 
+  // hover a commit: its neighbours stay lit, the rest of the web fades out
+  const focus = useMemo(() => {
+    if (!hovered) return null;
+    const set = new Set<string>([hovered.hash]);
+    for (const [from, to] of links.current) {
+      if (from.commit.hash === hovered.hash) set.add(to.commit.hash);
+      if (to.commit.hash === hovered.hash) set.add(from.commit.hash);
+    }
+    return set;
+  }, [hovered, commits]);
+
   const tick = () => {
     const ns = nodes.current;
     const a = (alpha.current *= 0.985);
-    // everything pushes apart, parents pull their kids back
+    hot.current = false;
+    // everything pushes apart, parents pull their kids back, nodes never overlap
     for (let i = 0; i < ns.length; i++) {
       const n = ns[i];
       for (let j = i + 1; j < ns.length; j++) {
@@ -430,6 +443,20 @@ function Orbit({
         n.vy += dy * f;
         m.vx -= dx * f;
         m.vy -= dy * f;
+        if (d < 36) {
+          hot.current = true;
+          const push = ((36 - d) / d) * 0.4;
+          const px = dx * push;
+          const py = dy * push;
+          if (n.fx == null) {
+            n.x += px;
+            n.y += py;
+          }
+          if (m.fx == null) {
+            m.x -= px;
+            m.y -= py;
+          }
+        }
       }
       n.vx -= n.x * 0.012 * a;
       n.vy -= n.y * 0.012 * a;
@@ -468,7 +495,9 @@ function Orbit({
       tick();
       setTick((t) => t + 1);
       frame.current =
-        alpha.current > 0.02 || dragging.current ? requestAnimationFrame(step) : 0;
+        alpha.current > 0.02 || dragging.current || (hot.current && alpha.current > 0.004)
+          ? requestAnimationFrame(step)
+          : 0;
     };
     frame.current = requestAnimationFrame(step);
   };
@@ -581,7 +610,7 @@ function Orbit({
         </button>
       </div>
       <div className="pointer-events-none absolute left-3 top-3 z-10 rounded-lg border border-white/10 bg-black/40 px-2 py-1 text-[9px] text-white/45">
-        drag — pan · wheel — zoom · drag a commit — place it
+        drag — pan · wheel — zoom · drag a commit — place it · hover — trace its branch
       </div>
       <svg
         width={size.width}
@@ -647,7 +676,13 @@ function Orbit({
               y2={to.y}
               stroke={COLORS[from.commit.lane % COLORS.length]}
               strokeWidth={1.4 / camera.k}
-              opacity=".45"
+              opacity={
+                focus
+                  ? focus.has(from.commit.hash) && focus.has(to.commit.hash)
+                    ? 0.55
+                    : 0.05
+                  : 0.45
+              }
             />
           ))}
           {nodes.current.map((node) => {
@@ -657,6 +692,7 @@ function Orbit({
             const info = meta.get(commit.hash);
             const isHead = commit.refs.some((ref) => ref.includes('HEAD'));
             const cat = categoryColor(commit, risk, info?.root ?? false, isHead);
+            const dim = focus !== null && !focus.has(commit.hash);
             const nodeRadius = radius(active ? 12 : 7, item);
             return (
               <g
@@ -664,6 +700,7 @@ function Orbit({
                 data-hash={commit.hash}
                 key={commit.hash}
                 className="cursor-pointer"
+                opacity={dim ? 0.22 : 1}
                 onPointerEnter={() => setHovered(commit)}
                 onPointerLeave={() => setHovered(null)}
               >
@@ -706,7 +743,7 @@ function Orbit({
                     opacity=".6"
                   />
                 )}
-                {(active || camera.k > 0.75) && (
+                {(active || camera.k > 0.6) && (
                   <text
                     x={node.x}
                     y={node.y + nodeRadius + 14}
