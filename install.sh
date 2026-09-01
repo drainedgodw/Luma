@@ -24,7 +24,7 @@ readonly ICON_URL="https://raw.githubusercontent.com/$REPO/$REF/build/icon.png"
 readonly SOURCE_URL="https://github.com/$REPO/archive/refs/heads/$REF.tar.gz"
 
 ACTION="install"
-CHANNEL="${LUMA_CHANNEL:-release}"
+CHANNEL="${LUMA_CHANNEL:-nightly}"
 TMP_DIR=""
 APPIMAGE=""
 VERSION=""
@@ -42,7 +42,7 @@ usage() {
 Luma user-local installer
 
 Usage:
-  install.sh [--install|--update|--uninstall|--purge] [--release|--nightly|--source]
+  install.sh [--install|--update|--uninstall|--purge] [--nightly|--release|--source]
 
 Actions:
   --install       Install or atomically update Luma (default)
@@ -51,14 +51,14 @@ Actions:
   --purge         Uninstall and also remove Luma settings, cache and credentials
 
 Channels:
+  --nightly       Rolling build of the latest main commit (default)
   --release       Require a GitHub Release AppImage
-  --nightly       Install the rolling build of the latest main commit
   --source        Build the current main branch, like an AUR -git package
   auto            Prefer a release, then the nightly; build from source as a last resort
 
 Environment:
   LUMA_REF=main                 Source branch to build
-  LUMA_CHANNEL=release|nightly|source|auto
+  LUMA_CHANNEL=nightly|release|source|auto
   LUMA_APPIMAGE_FILE=/path      Install a local AppImage (testing/manual package)
   LUMA_ICON_FILE=/path          Use a local PNG icon instead of build/icon.png
   LUMA_NO_SANDBOX=1             Add --no-sandbox to the generated launcher
