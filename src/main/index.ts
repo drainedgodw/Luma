@@ -5,6 +5,7 @@ import { registerRecentReposIpc } from './recentRepos';
 import { registerWorkspaceIpc } from './workspaceIpc';
 import { registerGitHubIpc } from './githubIpc';
 import { registerIntelligenceIpc } from './intelligenceIpc';
+import { registerUpdateIpc } from './update';
 import { getWallpaper } from './wallpaper';
 
 app.commandLine.appendSwitch('enable-smooth-scrolling');
@@ -78,6 +79,7 @@ app.whenReady().then(() => {
   registerWorkspaceIpc(() => win);
   registerGitHubIpc(() => win);
   registerIntelligenceIpc(() => win);
+  registerUpdateIpc();
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();

@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { Commit } from '@shared/types';
+import { useMemo, useState } from 'react';
 import { layoutGraph, LANE_COLORS } from '@shared/graph';
 import { useStore } from '../store';
 import { gitCall } from '../lib/api';
@@ -7,17 +6,8 @@ import { gitCall } from '../lib/api';
 export default function BisectView({ active, onClose }: { active: boolean; onClose: () => void }) {
   const { commits, refresh, setToast, status } = useStore();
   const laid = useMemo(() => layoutGraph(commits), [commits]);
-  const marked = useMemo(() => {
-    const map = new Map<string, 'good' | 'bad'>();
-    // re-derive marks from status: bisect HEAD + walk is unreliable from UI;
-    // we track marks locally via bisect log through IPC state
-    return map;
-  }, [commits]);
+  const [marks, setMarks] = useState<Record<string, 'good' | 'bad'>>({});
   const [asking, setAsking] = useState<string | null>(null);
-
-  useEffect(() => {
-    // no-op placeholder for future log parsing
-  }, [active]);
 
   if (!active) return null;
 
@@ -25,8 +15,10 @@ export default function BisectView({ active, onClose }: { active: boolean; onClo
 
   async function mark(good: boolean) {
     try {
+      const checked = head?.hash;
       await gitCall('bisectMark', good);
       await refresh();
+      if (checked) setMarks((m) => ({ ...m, [checked]: good ? 'good' : 'bad' }));
     } catch (e) {
       setToast((e as Error).message);
     }
@@ -48,6 +40,7 @@ export default function BisectView({ active, onClose }: { active: boolean; onClo
             onClick={async () => {
               await gitCall('bisectReset');
               await refresh();
+              setMarks({});
               onClose();
             }}
           >
@@ -63,7 +56,7 @@ export default function BisectView({ active, onClose }: { active: boolean; onClo
             current suspect
           </div>
           {laid.slice(0, 40).map((c) => {
-            const m = marked.get(c.hash);
+            const m = marks[c.hash];
             const isHead = head && c.hash === head.hash;
             return (
               <div

@@ -1,5 +1,7 @@
+import { useCallback, useEffect, useState } from 'react';
 import { useSettings } from '../settings';
 import { useStore } from '../store';
+import { api } from '../lib/api';
 
 export default function SettingsView() {
   const { settings, update } = useSettings();
@@ -121,6 +123,8 @@ export default function SettingsView() {
             />
           </section>
 
+          <Updates />
+
           <section>
             <h2 className="mb-1 text-sm font-semibold text-white/85">About</h2>
             <div className="glass-soft flex items-center justify-between px-4 py-3">
@@ -137,6 +141,70 @@ export default function SettingsView() {
         </div>
       </div>
     </div>
+  );
+}
+
+function Updates() {
+  const [info, setInfo] = useState<{ current: string; latest: string; update: boolean } | null>(
+    null
+  );
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const check = useCallback(async () => {
+    setBusy(true);
+    const result = await api.updateCheck();
+    if (result.ok && result.data) setInfo(result.data);
+    else if (!result.ok) setNote(result.error?.message ?? 'check failed');
+    setBusy(false);
+  }, []);
+
+  useEffect(() => {
+    void check();
+  }, [check]);
+
+  const run = (channel: 'release' | 'nightly') => {
+    setBusy(true);
+    setNote('Downloading and swapping the install — Luma restarts when done.');
+    void api.updateRun(channel);
+  };
+
+  return (
+    <section>
+      <h2 className="mb-1 text-sm font-semibold text-white/85">Updates</h2>
+      <p className="mb-3 text-xs text-white/35">
+        Anonymous check against a plain version file in the repo — no accounts, no telemetry.
+      </p>
+      <div className="glass-soft flex items-center justify-between gap-3 px-4 py-3">
+        <div className="text-xs text-white/55">
+          {info
+            ? info.update
+              ? `Luma ${info.latest} is available — you run ${info.current}.`
+              : `You run ${info.current}, the latest release.`
+            : 'Checking…'}
+          {note && <div className="mt-1 text-[11px] text-amber">{note}</div>}
+        </div>
+        <div className="flex shrink-0 gap-2">
+          {info?.update && (
+            <button
+              className="btn btn-primary px-3 py-1 text-xs"
+              disabled={busy}
+              onClick={() => run('release')}
+            >
+              Update to {info.latest}
+            </button>
+          )}
+          <button
+            className="btn px-3 py-1 text-xs"
+            disabled={busy}
+            title="Reinstall from the latest main build"
+            onClick={() => run('nightly')}
+          >
+            Latest commit
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }
 
