@@ -34,6 +34,7 @@
 
 - [ ] PR CI: typecheck, tests, build, native rebuild and AppImage package.
 - [ ] Tag CI: AppImage, tarball and SHA256SUMS.
+- [ ] Release artifacts carry cosign bundles (`*.sigstore.json`), `verify-blob` passes.
 - [ ] AppImage starts with FUSE.
 - [ ] Extracted AppImage starts without FUSE.
 - [ ] Wayland and X11 launch tested.
@@ -42,6 +43,7 @@
 
 ## After publishing
 
+- [ ] `update.json` on main points at the new release (the release workflow does this).
 - [ ] Download assets from the public release rather than Actions.
 - [ ] Re-test a clean installation.
 - [ ] Confirm security contact and issue templates are visible.

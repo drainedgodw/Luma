@@ -27,9 +27,16 @@ One command — installs to `~/.local`, adds Luma to your application menu, no N
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/drainedgodw/Luma/main/install.sh)"
 ```
 
-Run it again to update. Remove with `-- --uninstall` (keep settings) or `-- --purge` (remove everything).
+The installer works like a tiny pacman/AUR: it resolves the right artifact, verifies it, and swaps the install atomically. The same command installs and updates. Remove with `-- --uninstall` (keep settings) or `-- --purge` (remove everything).
 
-Manual download is also available from [GitHub Releases](https://github.com/drainedgodw/Luma/releases) — verify the published SHA-256 checksum.
+Manual download is also available from [GitHub Releases](https://github.com/drainedgodw/Luma/releases). Every artifact carries a SHA-256 checksum and a keyless cosign bundle (`*.sigstore.json`) signed by this repo's GitHub Actions identity — the installer verifies the checksum always and the signature whenever `cosign` is present:
+
+```sh
+cosign verify-blob --bundle Luma-0.1.0.AppImage.sigstore.json \
+  --certificate-identity-regexp 'https://github[.]com/drainedgodw/Luma/[.]github/workflows/release[.]yml@.*' \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  Luma-0.1.0.AppImage
+```
 
 ### From source
 
@@ -51,6 +58,7 @@ The bootstrap downloads a private, compatible Node 22 and a private CPython 3.11
 - **Terminal** — integrated terminal, unlocked per repository via Workspace Trust
 - **GitHub** — fine-grained PAT or SSH keys, clone, fetch, pull, push; the token is encrypted and never stored in plain text
 - **Languages & Ecosystem** — detects runtimes and project dependencies, installs packages and frameworks with a whitelisted command set
+- **Updates** — anonymous version check against a plain `update.json` file (no accounts, no telemetry); update to the release or the latest main build from Settings
 - **Two themes** — Cosmos and Liquid Glass
 
 ## Keyboard

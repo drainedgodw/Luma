@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Luma user-local installer. Installs an AppImage like a small package manager:
-# application files, launcher, desktop entry and icon all live under ~/.local.
+# Luma user-local installer. Works like a tiny pacman/AUR: resolves the right
+# artifact, verifies it (SHA-256 always, cosign when available), swaps the
+# install atomically. App, launcher, desktop entry and icon live under ~/.local.
 
 set -Eeuo pipefail
 IFS=$'\n\t'
@@ -41,7 +42,7 @@ usage() {
 Luma user-local installer
 
 Usage:
-  install.sh [--install|--update|--uninstall|--purge] [--release|--source]
+  install.sh [--install|--update|--uninstall|--purge] [--release|--nightly|--source]
 
 Actions:
   --install       Install or atomically update Luma (default)
@@ -51,15 +52,17 @@ Actions:
 
 Channels:
   --release       Require a GitHub Release AppImage
+  --nightly       Install the rolling build of the latest main commit
   --source        Build the current main branch, like an AUR -git package
-  auto            Prefer a release; build from source when none exists
+  auto            Prefer a release, then the nightly; build from source as a last resort
 
 Environment:
   LUMA_REF=main                 Source branch to build
-  LUMA_CHANNEL=release|source|auto
+  LUMA_CHANNEL=release|nightly|source|auto
   LUMA_APPIMAGE_FILE=/path      Install a local AppImage (testing/manual package)
   LUMA_ICON_FILE=/path          Use a local PNG icon instead of build/icon.png
-  LUMA_NO_SANDBOX=1            Add --no-sandbox to the generated launcher
+  LUMA_NO_SANDBOX=1             Add --no-sandbox to the generated launcher
+  LUMA_SKIP_COSIGN=1            Skip the optional cosign signature check
 
 Rerun the installer to update Luma.
 USAGE
@@ -72,13 +75,14 @@ parse_args() {
       --uninstall) ACTION="uninstall" ;;
       --purge) ACTION="purge" ;;
       --release) CHANNEL="release" ;;
+      --nightly) CHANNEL="nightly" ;;
       --source) CHANNEL="source" ;;
       -h|--help) ACTION="help" ;;
       *) die "Unknown option: $1" ;;
     esac
     shift
   done
-  case "$CHANNEL" in auto|release|source) ;; *) die "Invalid channel: $CHANNEL" ;; esac
+  case "$CHANNEL" in auto|release|nightly|source) ;; *) die "Invalid channel: $CHANNEL" ;; esac
 }
 
 need() { command -v "$1" >/dev/null 2>&1 || die "Required command is missing: $1"; }
@@ -98,6 +102,24 @@ import hashlib, pathlib, sys
 print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())
 PY
   fi
+}
+
+# Keyless verification: the signature proves the blob came from this repo's
+# GitHub Actions workflow. Optional — the SHA-256 check above is mandatory.
+verify_cosign() {
+  local file="$1" asset_url="$2" bundle
+  [[ -z "${LUMA_SKIP_COSIGN:-}" ]] || return 0
+  command -v cosign >/dev/null 2>&1 || return 0
+  bundle="$TMP_DIR/$(basename -- "$file").sigstore.json"
+  if ! fetch "$asset_url.sigstore.json" "$bundle"; then
+    warn 'No cosign bundle for this build; SHA-256 checksum already verified.'
+    return 0
+  fi
+  cosign verify-blob --bundle "$bundle" \
+    --certificate-identity-regexp "https://github[.]com/$REPO/[.]github/workflows/(release|ci)[.]yml@.*" \
+    --certificate-oidc-issuer 'https://token.actions.githubusercontent.com' \
+    "$file" >/dev/null 2>&1 || die 'Cosign signature verification failed.'
+  log 'Cosign signature verified (keyless, GitHub Actions identity).'
 }
 
 refresh_desktop() {
@@ -147,40 +169,37 @@ PY
 )"
   fi
 
-  if [[ -n "$resolved" ]]; then
-    local tag asset_name app_url sums_url expected actual
-    tag="$(sed -n '1p' <<< "$resolved")"
-    asset_name="$(sed -n '2p' <<< "$resolved")"
-    app_url="$(sed -n '3p' <<< "$resolved")"
-    sums_url="$(sed -n '4p' <<< "$resolved")"
-    APPIMAGE="$TMP_DIR/$asset_name"
-    log "Downloading Luma release $tag..."
-    fetch "$sums_url" "$TMP_DIR/SHA256SUMS.txt"
-    fetch "$app_url" "$APPIMAGE"
-    expected="$(awk -v file="$asset_name" '$2 == file {print $1; exit}' "$TMP_DIR/SHA256SUMS.txt")"
-    [[ -n "$expected" ]] || die "SHA256SUMS.txt does not contain $asset_name."
-    actual="$(sha256_file "$APPIMAGE")"
-    [[ "$actual" == "$expected" ]] || die 'AppImage checksum verification failed.'
-    VERSION="$tag"
-    return 0
-  fi
+  [[ -n "$resolved" ]] || return 1
+  local tag asset_name app_url sums_url expected actual
+  tag="$(sed -n '1p' <<< "$resolved")"
+  asset_name="$(sed -n '2p' <<< "$resolved")"
+  app_url="$(sed -n '3p' <<< "$resolved")"
+  sums_url="$(sed -n '4p' <<< "$resolved")"
+  APPIMAGE="$TMP_DIR/$asset_name"
+  log "Downloading Luma release $tag..."
+  fetch "$sums_url" "$TMP_DIR/SHA256SUMS.txt"
+  fetch "$app_url" "$APPIMAGE"
+  expected="$(awk -v file="$asset_name" '$2 == file {print $1; exit}' "$TMP_DIR/SHA256SUMS.txt")"
+  [[ -n "$expected" ]] || die "SHA256SUMS.txt does not contain $asset_name."
+  actual="$(sha256_file "$APPIMAGE")"
+  [[ "$actual" == "$expected" ]] || die 'AppImage checksum verification failed.'
+  verify_cosign "$APPIMAGE" "$app_url"
+  VERSION="$tag"
+}
 
+resolve_nightly() {
   local nightly_sums="$TMP_DIR/nightly-SHA256SUMS.txt" nightly_asset expected actual
-  if fetch "$NIGHTLY_URL/SHA256SUMS.txt" "$nightly_sums"; then
-    nightly_asset="$(awk '$2 ~ /[.]AppImage$/ {print $2; exit}' "$nightly_sums")"
-    expected="$(awk '$2 ~ /[.]AppImage$/ {print $1; exit}' "$nightly_sums")"
-    if [[ -n "$nightly_asset" && -n "$expected" ]]; then
-      APPIMAGE="$TMP_DIR/$nightly_asset"
-      log 'No stable release found; downloading the nightly AppImage...'
-      fetch "$NIGHTLY_URL/$nightly_asset" "$APPIMAGE"
-      actual="$(sha256_file "$APPIMAGE")"
-      [[ "$actual" == "$expected" ]] || die 'Nightly AppImage checksum verification failed.'
-      VERSION="nightly"
-      return 0
-    fi
-  fi
-
-  return 1
+  fetch "$NIGHTLY_URL/SHA256SUMS.txt" "$nightly_sums" || return 1
+  nightly_asset="$(awk '$2 ~ /[.]AppImage$/ {print $2; exit}' "$nightly_sums")"
+  expected="$(awk '$2 ~ /[.]AppImage$/ {print $1; exit}' "$nightly_sums")"
+  [[ -n "$nightly_asset" && -n "$expected" ]] || return 1
+  APPIMAGE="$TMP_DIR/$nightly_asset"
+  log 'Downloading the nightly AppImage (latest main commit)...'
+  fetch "$NIGHTLY_URL/$nightly_asset" "$APPIMAGE"
+  actual="$(sha256_file "$APPIMAGE")"
+  [[ "$actual" == "$expected" ]] || die 'Nightly AppImage checksum verification failed.'
+  verify_cosign "$APPIMAGE" "$NIGHTLY_URL/$nightly_asset"
+  VERSION="nightly"
 }
 
 build_from_source() {
@@ -207,8 +226,9 @@ resolve_appimage() {
 
   case "$CHANNEL" in
     release) resolve_release || die 'No GitHub Release with AppImage and SHA256SUMS.txt is available.' ;;
+    nightly) resolve_nightly || die 'No nightly AppImage is available.' ;;
     source) build_from_source ;;
-    auto) resolve_release || build_from_source ;;
+    auto) resolve_release || resolve_nightly || build_from_source ;;
   esac
 }
 

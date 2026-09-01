@@ -2,6 +2,21 @@
 
 All notable changes are documented here. Luma follows semantic versioning once stable; `0.x` releases may change behavior between prereleases.
 
+## [Unreleased]
+
+### Added
+
+- Anonymous update check against a plain `update.json` file (no accounts, no telemetry); the app offers an update only when a newer release exists, and Settings can reinstall to the latest main build.
+- Unit tests for the graph lane layout.
+- Release and nightly artifacts are signed with keyless cosign; `install.sh` verifies the signature when cosign is available.
+- `install.sh --nightly` installs the rolling build of the latest main commit.
+
+### Changed
+
+- Simpler graph lane assignment.
+- Bisect view tracks good/bad marks per commit.
+- Release workflow builds through the bootstrap like CI does.
+
 ## [0.1.0] - 2026-09-01
 
 ### Added
