@@ -228,7 +228,7 @@ export default function GraphWorkspace({ onRebase }: { onRebase?: (branch: strin
           }}
           prepare={prepare}
         />
-      )}{' '}
+      )}
       {preview && <PreviewModal preview={preview} cancel={() => setPreview(null)} apply={apply} />}
     </div>
   );
@@ -408,17 +408,6 @@ function Orbit({
     );
   }, [commits]);
 
-  const loop = () => {
-    if (frame.current) return;
-    const step = () => {
-      tick();
-      setTick((t) => t + 1);
-      frame.current =
-        alpha.current > 0.02 || dragging.current ? requestAnimationFrame(step) : 0;
-    };
-    frame.current = requestAnimationFrame(step);
-  };
-
   const tick = () => {
     const ns = nodes.current;
     const a = (alpha.current *= 0.985);
@@ -473,6 +462,17 @@ function Orbit({
     }
   };
 
+  const loop = () => {
+    if (frame.current) return;
+    const step = () => {
+      tick();
+      setTick((t) => t + 1);
+      frame.current =
+        alpha.current > 0.02 || dragging.current ? requestAnimationFrame(step) : 0;
+    };
+    frame.current = requestAnimationFrame(step);
+  };
+
   // rebuild the web when history or the pane itself changes
   useEffect(() => {
     const list = commits.slice(0, 400);
@@ -522,7 +522,6 @@ function Orbit({
       cancelAnimationFrame(frame.current);
       frame.current = 0;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [commits, size]);
 
   const toWorld = (clientX: number, clientY: number) => {
