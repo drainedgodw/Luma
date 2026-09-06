@@ -2,6 +2,19 @@
 
 All notable changes are documented here. Luma follows semantic versioning once stable; `0.x` releases may change behavior between prereleases.
 
+## [0.2.0] - 2026-09-06
+
+### Added
+
+- Pleasant, contextual interface sounds for regular taps, navigation, toggles, primary actions and destructive controls.
+- Sound controls in Settings, including a master switch and volume slider.
+- A draggable terminal divider with keyboard resizing, remembered height and a one-click maximize/restore control.
+
+### Changed
+
+- The integrated terminal now refits its PTY automatically while it is resized or maximized.
+- Release metadata and in-app version information now identify the 0.2.0 line.
+
 ## [0.1.1] - 2026-09-01
 
 ### Added

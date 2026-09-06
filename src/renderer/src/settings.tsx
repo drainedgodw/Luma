@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
+import { playUISound, soundForButton } from './uiSounds';
 
 export interface Settings {
   fontSize: number;
@@ -10,6 +11,8 @@ export interface Settings {
   theme: 'cosmos' | 'liquid';
   installedPacks: string[];
   explorer: 'pinned' | 'auto';
+  soundEffects: boolean;
+  soundVolume: number;
 }
 
 const DEFAULTS: Settings = {
@@ -22,6 +25,8 @@ const DEFAULTS: Settings = {
   theme: 'cosmos',
   installedPacks: ['typescript', 'javascript'],
   explorer: 'auto',
+  soundEffects: true,
+  soundVolume: 0.45,
 };
 
 const KEY = 'luma.settings';
@@ -48,6 +53,19 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.classList.toggle('reduce-motion', settings.reduceMotion);
     document.documentElement.dataset.theme = settings.theme;
   }, [settings]);
+
+  useEffect(() => {
+    const onClick = (event: MouseEvent) => {
+      if (!settings.soundEffects || settings.soundVolume <= 0 || !(event.target instanceof Element))
+        return;
+      const button = event.target.closest('button');
+      if (!(button instanceof HTMLButtonElement) || button.disabled) return;
+      const sound = soundForButton(button);
+      if (sound) playUISound(sound, settings.soundVolume);
+    };
+    document.addEventListener('click', onClick, true);
+    return () => document.removeEventListener('click', onClick, true);
+  }, [settings.soundEffects, settings.soundVolume]);
 
   // allow the host to force a theme (used by visual test harness)
   useEffect(() => {

@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import type {
+  KeyboardEvent as ReactKeyboardEvent,
+  PointerEvent as ReactPointerEvent,
+} from 'react';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -8,6 +12,11 @@ import { useSettings } from '../settings';
 
 let counter = 0;
 type TrustState = 'checking' | 'restricted' | 'trusted';
+
+const MIN_RATIO = 22;
+const MAX_RATIO = 82;
+const DEFAULT_RATIO = 38;
+const HEIGHT_KEY = 'luma.terminalHeight';
 
 const THEMES = {
   cosmos: {
@@ -24,20 +33,86 @@ const THEMES = {
   },
 } as const;
 
+function clampRatio(value: number): number {
+  return Math.min(MAX_RATIO, Math.max(MIN_RATIO, value));
+}
+
+function storedRatio(): number {
+  try {
+    const stored = localStorage.getItem(HEIGHT_KEY);
+    if (stored === null) return DEFAULT_RATIO;
+    const value = Number(stored);
+    return Number.isFinite(value) ? clampRatio(value) : DEFAULT_RATIO;
+  } catch {
+    return DEFAULT_RATIO;
+  }
+}
+
 export default function TerminalPanel({ onClose }: { onClose: () => void }) {
+  const panel = useRef<HTMLDivElement>(null);
   const holder = useRef<HTMLDivElement>(null);
   const termRef = useRef<Terminal | null>(null);
+  const dragCleanup = useRef<(() => void) | null>(null);
   const { repo } = useStore();
   const { settings } = useSettings();
   const [id] = useState(() => `term-${Date.now()}-${++counter}`);
   const [trust, setTrust] = useState<TrustState>('checking');
   const [trustError, setTrustError] = useState('');
+  const [heightRatio, setHeightRatio] = useState(storedRatio);
+  const [maximized, setMaximized] = useState(false);
   const theme = THEMES[settings.theme === 'liquid' ? 'liquid' : 'cosmos'];
 
   useEffect(() => {
     localStorage.setItem('luma.terminalOpen', '1');
     return () => localStorage.setItem('luma.terminalOpen', '0');
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(HEIGHT_KEY, String(heightRatio));
+  }, [heightRatio]);
+
+  useEffect(() => {
+    const frame = panel.current?.parentElement as HTMLElement | null;
+    const stack = frame?.parentElement as HTMLElement | null;
+    if (!frame || !stack) return;
+    const previousFrame = {
+      position: frame.style.position,
+      inset: frame.style.inset,
+      zIndex: frame.style.zIndex,
+      height: frame.style.height,
+      minHeight: frame.style.minHeight,
+      flexShrink: frame.style.flexShrink,
+    };
+    const previousStackPosition = stack.style.position;
+    return () => {
+      Object.assign(frame.style, previousFrame);
+      stack.style.position = previousStackPosition;
+    };
+  }, []);
+
+  useEffect(() => {
+    const frame = panel.current?.parentElement as HTMLElement | null;
+    const stack = frame?.parentElement as HTMLElement | null;
+    if (!frame || !stack) return;
+    stack.style.position = 'relative';
+    if (maximized) {
+      frame.style.position = 'absolute';
+      frame.style.inset = '0';
+      frame.style.zIndex = '30';
+      frame.style.height = 'auto';
+      frame.style.minHeight = '0';
+      frame.style.flexShrink = '1';
+    } else {
+      frame.style.position = '';
+      frame.style.inset = '';
+      frame.style.zIndex = '';
+      frame.style.height = `${heightRatio}%`;
+      frame.style.minHeight = '160px';
+      frame.style.flexShrink = '0';
+    }
+  }, [heightRatio, maximized]);
+
+  useEffect(() => () => dragCleanup.current?.(), []);
 
   useEffect(() => {
     let active = true;
@@ -137,6 +212,57 @@ export default function TerminalPanel({ onClose }: { onClose: () => void }) {
     };
   }, [id, repo, settings.reduceMotion, trust]);
 
+  function beginResize(event: ReactPointerEvent<HTMLDivElement>) {
+    if (event.button !== 0) return;
+    const frame = panel.current?.parentElement as HTMLElement | null;
+    const stack = frame?.parentElement as HTMLElement | null;
+    if (!stack) return;
+    event.preventDefault();
+    dragCleanup.current?.();
+    setMaximized(false);
+    const bounds = stack.getBoundingClientRect();
+    const setFromPointer = (clientY: number) => {
+      const ratio = ((bounds.bottom - clientY) / Math.max(bounds.height, 1)) * 100;
+      setHeightRatio(clampRatio(ratio));
+    };
+    setFromPointer(event.clientY);
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+
+    const move = (next: PointerEvent) => setFromPointer(next.clientY);
+    const stop = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+      window.removeEventListener('blur', stop);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      dragCleanup.current = null;
+    };
+    dragCleanup.current = stop;
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+    window.addEventListener('blur', stop);
+  }
+
+  function resizeWithKeyboard(event: ReactKeyboardEvent<HTMLDivElement>) {
+    let next: number | null = null;
+    if (event.key === 'ArrowUp') next = heightRatio + 4;
+    else if (event.key === 'ArrowDown') next = heightRatio - 4;
+    else if (event.key === 'Home') next = MIN_RATIO;
+    else if (event.key === 'End') next = MAX_RATIO;
+    else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setMaximized((value) => !value);
+      return;
+    }
+    if (next === null) return;
+    event.preventDefault();
+    setMaximized(false);
+    setHeightRatio(clampRatio(next));
+  }
+
   async function trustRepository() {
     if (
       !window.confirm(
@@ -155,13 +281,51 @@ export default function TerminalPanel({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="term-panel flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border">
+    <div
+      ref={panel}
+      className="term-panel flex h-full min-h-0 flex-col overflow-hidden rounded-[14px] border"
+    >
       <style>{`.term-panel .xterm,.term-panel .xterm-viewport,.term-panel .xterm-screen{background:transparent!important}.term-panel .xterm-viewport{scrollbar-color:rgba(255,255,255,.16) transparent}`}</style>
+      <div
+        role="separator"
+        aria-label="Resize terminal"
+        aria-orientation="horizontal"
+        aria-valuemin={MIN_RATIO}
+        aria-valuemax={MAX_RATIO}
+        aria-valuenow={Math.round(heightRatio)}
+        aria-valuetext={maximized ? 'Maximized' : `${Math.round(heightRatio)} percent`}
+        tabIndex={0}
+        title="Drag to resize · Double-click or press Enter to maximize"
+        onPointerDown={beginResize}
+        onDoubleClick={() => setMaximized((value) => !value)}
+        onKeyDown={resizeWithKeyboard}
+        className="group flex h-3 shrink-0 touch-none cursor-ns-resize items-center justify-center outline-none focus-visible:bg-lilac/10"
+      >
+        <span className="h-0.5 w-12 rounded-full bg-white/12 transition-colors group-hover:bg-lilac/60 group-focus-visible:bg-lilac/70" />
+      </div>
       <div className="flex items-center gap-2 border-b border-white/8 px-3 py-1.5">
         <span className="text-[11px] uppercase tracking-wider text-white/40">Terminal</span>
         <span className="truncate font-mono text-[10px] text-white/25">{repo}</span>
         <div className="flex-1" />
-        <button className="text-[11px] text-white/40 hover:text-white" onClick={onClose}>
+        <span className="text-[10px] text-white/20">
+          {maximized ? 'maximized' : `${Math.round(heightRatio)}%`}
+        </span>
+        <button
+          aria-label={maximized ? 'Restore terminal size' : 'Maximize terminal'}
+          title={maximized ? 'Restore terminal size' : 'Maximize terminal'}
+          data-ui-sound="navigation"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-[12px] text-white/40 hover:bg-white/8 hover:text-white"
+          onClick={() => setMaximized((value) => !value)}
+        >
+          {maximized ? '↙' : '↗'}
+        </button>
+        <button
+          aria-label="Close terminal"
+          title="Close terminal"
+          data-ui-sound="destructive"
+          className="flex h-7 w-7 items-center justify-center rounded-md text-[11px] text-white/40 hover:bg-white/8 hover:text-white"
+          onClick={onClose}
+        >
           ✕
         </button>
       </div>
