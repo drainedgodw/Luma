@@ -39,7 +39,9 @@ function clampRatio(value: number): number {
 
 function storedRatio(): number {
   try {
-    const value = Number(localStorage.getItem(HEIGHT_KEY));
+    const stored = localStorage.getItem(HEIGHT_KEY);
+    if (stored === null) return DEFAULT_RATIO;
+    const value = Number(stored);
     return Number.isFinite(value) ? clampRatio(value) : DEFAULT_RATIO;
   } catch {
     return DEFAULT_RATIO;
