@@ -75,8 +75,8 @@ export default function SettingsView() {
           </section>
 
           <section>
-            <h2 className="mb-1 text-sm font-semibold text-white/85">Appearance</h2>
-            <p className="mb-3 text-xs text-white/35">Theme and motion.</p>
+            <h2 className="mb-1 text-sm font-semibold text-white/85">Appearance & sound</h2>
+            <p className="mb-3 text-xs text-white/35">Theme, motion and interface feedback.</p>
             <div className="mb-3 grid grid-cols-2 gap-3">
               {(['cosmos', 'liquid'] as const).map((t) => (
                 <button
@@ -116,6 +116,30 @@ export default function SettingsView() {
               ))}
             </div>
             <Toggle
+              label="Interface sounds"
+              hint="Subtle, distinct tones for navigation, actions and destructive controls"
+              value={settings.soundEffects}
+              onChange={(v) => update({ soundEffects: v })}
+            />
+            <Row label="Sound volume" hint="Volume of interface feedback; terminal audio is unchanged">
+              <div className={`flex items-center gap-3 ${settings.soundEffects ? '' : 'opacity-40'}`}>
+                <input
+                  aria-label="Interface sound volume"
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={5}
+                  disabled={!settings.soundEffects}
+                  value={Math.round(settings.soundVolume * 100)}
+                  onChange={(e) => update({ soundVolume: +e.target.value / 100 })}
+                  className="accent-lilac"
+                />
+                <span className="w-9 text-right font-mono text-xs text-white/60">
+                  {Math.round(settings.soundVolume * 100)}%
+                </span>
+              </div>
+            </Row>
+            <Toggle
               label="Reduce motion"
               hint="Disable pulsing and animated effects"
               value={settings.reduceMotion}
@@ -130,7 +154,7 @@ export default function SettingsView() {
             <div className="glass-soft flex items-center justify-between px-4 py-3">
               <div>
                 <div className="text-sm font-bold tracking-[0.25em] text-lilac">LUMA</div>
-                <div className="text-xs text-white/40">Version 0.1.0 · MIT license</div>
+                <div className="text-xs text-white/40">Version 0.2.0 · MIT license</div>
               </div>
               <div className="text-right font-mono text-[11px] text-white/35">
                 <div>{repo ? repo.split('/').pop() : 'no repository'}</div>
@@ -242,6 +266,10 @@ function Toggle({
   return (
     <Row label={label} hint={hint}>
       <button
+        role="switch"
+        aria-checked={value}
+        aria-label={label}
+        data-ui-sound="toggle"
         onClick={() => onChange(!value)}
         className={`relative h-6 w-11 rounded-full border transition-all duration-200 ${value ? 'border-lilac/60 bg-lilac/40' : 'border-white/15 bg-white/8'}`}
       >
