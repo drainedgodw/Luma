@@ -13,7 +13,7 @@ A Linux-first visual Git workspace: understandable history, previewable operatio
 </div>
 
 > [!WARNING]
-> Luma 0.1 is a developer preview. Keep a remote backup and begin with non-critical repositories.
+> Luma 0.2 is a developer preview. Keep a remote backup and begin with non-critical repositories.
 
 ## Why Luma?
 
@@ -32,10 +32,10 @@ The installer works like a tiny pacman/AUR: it resolves the right artifact, veri
 Manual download is also available from [GitHub Releases](https://github.com/drainedgodw/Luma/releases). Every artifact carries a SHA-256 checksum and a keyless cosign bundle (`*.sigstore.json`) signed by this repo's GitHub Actions identity — the installer verifies the checksum always and the signature whenever `cosign` is present:
 
 ```sh
-cosign verify-blob --bundle Luma-0.1.0.AppImage.sigstore.json \
+cosign verify-blob --bundle Luma-0.2.0.AppImage.sigstore.json \
   --certificate-identity-regexp 'https://github[.]com/drainedgodw/Luma/[.]github/workflows/release[.]yml@.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  Luma-0.1.0.AppImage
+  Luma-0.2.0.AppImage
 ```
 
 ### From source
@@ -55,7 +55,8 @@ The bootstrap downloads a private, compatible Node 22 and a private CPython 3.11
 - **Visual rebase** — reorder, squash, fixup, reword and drop commits; cherry-pick, revert, tags, merge strategy choice
 - **Safety net** — Secret Guard scans staged additions, every rollback creates a checkpoint branch, Rescue browses the reflog, bisect and stash included
 - **Editor** — CodeMirror 6 with syntax highlighting for 8 languages, tabs, find & replace, project-wide search (Ctrl+Shift+F), quick open (Ctrl+P)
-- **Terminal** — integrated terminal, unlocked per repository via Workspace Trust
+- **Terminal** — integrated terminal unlocked per repository via Workspace Trust; drag its divider to resize it, use the keyboard, or maximize it with one click
+- **Interface sounds** — subtle, distinct feedback for navigation, toggles and actions, with a master switch and volume control
 - **GitHub** — fine-grained PAT or SSH keys, clone, fetch, pull, push; the token is encrypted and never stored in plain text
 - **Languages & Ecosystem** — detects runtimes and project dependencies, installs packages and frameworks with a whitelisted command set
 - **Updates** — anonymous version check against a plain `update.json` file (no accounts, no telemetry); update to the release or the latest main build from Settings
@@ -69,6 +70,7 @@ The bootstrap downloads a private, compatible Node 22 and a private CPython 3.11
 - Ctrl + Shift + `P` — command palette
 - Ctrl + `B` — pin/auto-hide Explorer
 - Ctrl + `` ` `` — terminal
+- Terminal divider: ↑ / ↓ resize, Home / End choose minimum / maximum, Enter toggles maximize
 
 Full walkthrough: [docs/USERGUIDE.md](docs/USERGUIDE.md).
 
@@ -123,5 +125,5 @@ tests/          parser, Git integration, security and recovery tests
 **Stack** — the runtimes actually installed on the machine (Java and C# are missing here) and the project manifest that was detected.
 ![Stack](docs/screenshots/stack.png)
 
-**Settings** — editor, Git behavior, themes and the anonymous update check. This install runs the current 0.1.1.
+**Settings** — editor, Git behavior, themes, interface sounds and the anonymous update check. This install runs 0.2.0.
 ![Settings](docs/screenshots/setup.png)
