@@ -2,8 +2,8 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';
 import './theme.css';
+import './panel-blur.css';
 import './performance.css';
-import './wallpaper.css';
 
 createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

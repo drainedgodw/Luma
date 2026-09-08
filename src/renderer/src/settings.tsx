@@ -1,12 +1,12 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { playUISound, soundForButton } from './uiSounds';
 
-export const DEFAULT_WALLPAPER_BLUR = 18;
-export const MAX_WALLPAPER_BLUR = 40;
+export const DEFAULT_PANEL_BLUR = 32;
+export const MAX_PANEL_BLUR = 64;
 
-export function normalizeWallpaperBlur(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_WALLPAPER_BLUR;
-  return Math.min(MAX_WALLPAPER_BLUR, Math.max(0, Math.round(value)));
+export function normalizePanelBlur(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return DEFAULT_PANEL_BLUR;
+  return Math.min(MAX_PANEL_BLUR, Math.max(0, Math.round(value)));
 }
 
 export interface Settings {
@@ -17,7 +17,7 @@ export interface Settings {
   reduceMotion: boolean;
   wordWrap: boolean;
   theme: 'cosmos' | 'liquid';
-  wallpaperBlur: number;
+  panelBlur: number;
   installedPacks: string[];
   explorer: 'pinned' | 'auto';
   soundEffects: boolean;
@@ -32,7 +32,7 @@ const DEFAULTS: Settings = {
   reduceMotion: false,
   wordWrap: false,
   theme: 'cosmos',
-  wallpaperBlur: DEFAULT_WALLPAPER_BLUR,
+  panelBlur: DEFAULT_PANEL_BLUR,
   installedPacks: ['typescript', 'javascript'],
   explorer: 'auto',
   soundEffects: true,
@@ -41,6 +41,7 @@ const DEFAULTS: Settings = {
 
 const KEY = 'luma.settings';
 
+type StoredSettings = Partial<Settings> & { wallpaperBlur?: unknown };
 const Ctx = createContext<{ settings: Settings; update: (patch: Partial<Settings>) => void }>({
   settings: DEFAULTS,
   update: () => {},
@@ -50,11 +51,11 @@ export const useSettings = () => useContext(Ctx);
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<Settings>(() => {
     try {
-      const stored = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Settings>;
+      const stored = JSON.parse(localStorage.getItem(KEY) ?? '{}') as StoredSettings;
       return {
         ...DEFAULTS,
         ...stored,
-        wallpaperBlur: normalizeWallpaperBlur(stored.wallpaperBlur),
+        panelBlur: normalizePanelBlur(stored.panelBlur ?? stored.wallpaperBlur),
       };
     } catch {
       return DEFAULTS;
@@ -67,7 +68,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     localStorage.setItem(KEY, JSON.stringify(settings));
     document.documentElement.classList.toggle('reduce-motion', settings.reduceMotion);
     document.documentElement.dataset.theme = settings.theme;
-    document.documentElement.style.setProperty('--wallpaper-blur', `${settings.wallpaperBlur}px`);
+    document.documentElement.style.setProperty('--panel-blur', `${settings.panelBlur}px`);
   }, [settings]);
 
   useEffect(() => {
@@ -83,7 +84,6 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
     return () => document.removeEventListener('click', onClick, true);
   }, [settings.soundEffects, settings.soundVolume]);
 
-  // allow the host to force a theme (used by visual test harness)
   useEffect(() => {
     const on = (e: Event) => update({ theme: (e as CustomEvent<'cosmos' | 'liquid'>).detail });
     window.addEventListener('luma:theme', on);

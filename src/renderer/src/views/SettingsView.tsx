@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { MAX_WALLPAPER_BLUR, useSettings } from '../settings';
+import { MAX_PANEL_BLUR, useSettings } from '../settings';
 import { useStore } from '../store';
 import { api } from '../lib/api';
 
@@ -115,21 +115,21 @@ export default function SettingsView() {
                 </button>
               ))}
             </div>
-            <Row label="Background blur" hint="Blur strength for the desktop wallpaper in Liquid Glass">
+            <Row label="Panel blur" hint="Hyprland-style blur for the main panel, sidebars and glass blocks">
               <div className={`flex items-center gap-3 ${settings.theme === 'liquid' ? '' : 'opacity-40'}`}>
                 <input
-                  aria-label="Background blur"
+                  aria-label="Panel blur"
                   type="range"
                   min={0}
-                  max={MAX_WALLPAPER_BLUR}
+                  max={MAX_PANEL_BLUR}
                   step={1}
                   disabled={settings.theme !== 'liquid'}
-                  value={settings.wallpaperBlur}
-                  onChange={(e) => update({ wallpaperBlur: +e.target.value })}
+                  value={settings.panelBlur}
+                  onChange={(e) => update({ panelBlur: +e.target.value })}
                   className="accent-lilac"
                 />
                 <span className="w-9 text-right font-mono text-xs text-white/60">
-                  {settings.wallpaperBlur}px
+                  {settings.panelBlur}px
                 </span>
               </div>
             </Row>
@@ -250,15 +250,7 @@ function Updates() {
   );
 }
 
-function Row({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint: string;
-  children: React.ReactNode;
-}) {
+function Row({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-6 rounded-xl px-2 py-2 hover:bg-white/3">
       <div>
@@ -270,17 +262,7 @@ function Row({
   );
 }
 
-function Toggle({
-  label,
-  hint,
-  value,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
-}) {
+function Toggle({ label, hint, value, onChange }: { label: string; hint: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
     <Row label={label} hint={hint}>
       <button
