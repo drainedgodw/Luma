@@ -164,25 +164,7 @@ export async function stackToolStatus(
     } catch {}
   }
 
-  const python = virtualEnvironmentPython(repo, platform);
-  if (await fileExists(python)) {
-    const command: StackCommand = {
-      command: python,
-      args: ['-m', 'pip', 'list', '--format=json', '--disable-pip-version-check'],
-      display: 'python -m pip list --format=json',
-    };
-    const result = await runProcess(repo, command, 30_000);
-    if (result.code === 0) {
-      const start = result.output.indexOf('[');
-      const end = result.output.lastIndexOf(']');
-      if (start >= 0 && end > start) {
-        try {
-          const packages = JSON.parse(result.output.slice(start, end + 1)) as Array<{ name?: string }>;
-          detected.python = packages.map((item) => item.name ?? '').filter(Boolean);
-        } catch {}
-      }
-    }
-  }
+  detected.python = await pythonPackagesFromVirtualEnvironment(repo, platform);
 
   const cargo = await readText(join(repo, 'Cargo.toml'));
   if (cargo)
@@ -273,6 +255,37 @@ function virtualEnvironmentPython(repo: string, platform: NodeJS.Platform): stri
   return platform === 'win32'
     ? win32.join(repo, '.venv', 'Scripts', 'python.exe')
     : posix.join(repo, '.venv', 'bin', 'python');
+}
+
+async function pythonPackagesFromVirtualEnvironment(
+  repo: string,
+  platform: NodeJS.Platform
+): Promise<string[]> {
+  const pathApi = platform === 'win32' ? win32 : posix;
+  const sitePackages: string[] = [];
+  if (platform === 'win32') {
+    sitePackages.push(pathApi.join(repo, '.venv', 'Lib', 'site-packages'));
+  } else {
+    for (const libraryDirectory of ['lib', 'lib64']) {
+      const base = pathApi.join(repo, '.venv', libraryDirectory);
+      const versions = await readdir(base, { withFileTypes: true }).catch(() => []);
+      for (const version of versions) {
+        if (version.isDirectory() && /^python\d/.test(version.name))
+          sitePackages.push(pathApi.join(base, version.name, 'site-packages'));
+      }
+    }
+  }
+  const packages: string[] = [];
+  for (const directory of sitePackages) {
+    const entries = await readdir(directory, { withFileTypes: true }).catch(() => []);
+    for (const entry of entries) {
+      if (!entry.isDirectory() || !entry.name.endsWith('.dist-info')) continue;
+      const metadata = await readText(pathApi.join(directory, entry.name, 'METADATA'));
+      const name = metadata?.match(/^Name:\s*(.+)$/im)?.[1]?.trim();
+      if (name) packages.push(name);
+    }
+  }
+  return [...new Set(packages)];
 }
 
 async function singleDotnetProject(repo: string): Promise<string> {

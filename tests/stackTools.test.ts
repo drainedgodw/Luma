@@ -1,5 +1,13 @@
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { buildStackCommands, runStackToolAction, type NodePackageManager } from '../src/main/stackTools';
+import {
+  buildStackCommands,
+  runStackToolAction,
+  stackToolStatus,
+  type NodePackageManager,
+} from '../src/main/stackTools';
 import { stackToolDefinition } from '../src/shared/stackCatalog';
 
 function tool(packId: string, name: string) {
@@ -56,6 +64,18 @@ describe('Stack package actions', () => {
   it('rejects package names that are not in the shared catalog', async () => {
     await expect(runStackToolAction('/tmp/project', 'install', 'typescript', 'React && rm -rf /'))
       .rejects.toThrow('not an approved Stack package');
+  });
+  it('detects Python packages without executing repository-local code', async () => {
+    const repo = await mkdtemp(join(tmpdir(), 'luma-stack-'));
+    const metadata = join(repo, '.venv', 'lib', 'python3.12', 'site-packages', 'fastapi-1.0.dist-info');
+    try {
+      await mkdir(metadata, { recursive: true });
+      await writeFile(join(metadata, 'METADATA'), 'Metadata-Version: 2.1\nName: fastapi\n');
+      const status = await stackToolStatus(repo, 'linux');
+      expect(status['python:FastAPI']).toBe(true);
+    } finally {
+      await rm(repo, { recursive: true, force: true });
+    }
   });
   it('uses bun.exe rather than a nonexistent bun.cmd shim on Windows', () => {
     expect(buildStackCommands(tool('javascript', 'Vue'), 'install', 'win32', { nodeManager: 'bun' })[0].args)
