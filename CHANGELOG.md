@@ -6,18 +6,23 @@ All notable changes are documented here. Luma follows semantic versioning once s
 
 ### Fixed
 
-- Rebuilt Languages & Ecosystem (Stack) so supported dependencies have one-click install and remove actions.
-- Added installed-state refresh, removal confirmation and visible command output on Linux and Windows.
-- Made package-manager execution platform-aware for npm, pnpm, Yarn, Bun, Python, Cargo, Go and .NET.
+- Rebuilt Languages & Ecosystem (Stack) so supported project dependencies have one-click install and remove actions.
+- Added allowlisted runtime install/remove controls to every language card: Node.js, Python, Rust, Go, Java, .NET and C/C++.
+- Added platform-aware runtime plans for Windows `winget` and Linux apt, dnf, pacman and zypper through `pkexec`.
+- Added installed-state refresh, system-wide removal warnings and visible command output.
+- Restored the original transparent Liquid Glass layout and moved blur control from the wallpaper to the interface panels.
+- Added a persisted 0–64 px panel blur slider; the 32 px default preserves the original appearance.
 
 ### Security
 
-- Require Workspace Trust for Stack mutations and accept only shared-catalog package identifiers.
-- Prevent renderer input from becoming a shell command and avoid executing repository-local Python during status detection.
+- Require Workspace Trust for project package and system runtime mutations.
+- Accept only shared-catalog package/runtime identifiers and build every command in the main process with `shell: false`.
+- Bound process duration/output, serialize package-manager mutations and avoid executing repository-local Python during status detection.
 
 ### Known limitations
 
-- Java and C/C++ entries remain manual until a deterministic manifest mutation path is available.
+- Java and C/C++ runtime setup is automatic, but their framework/library entries remain manual until a deterministic project-manifest mutation path is available.
+- Newly installed or removed system runtimes require a Luma restart so the application inherits the updated system PATH.
 
 ## [0.2.0] - 2026-09-06
 
