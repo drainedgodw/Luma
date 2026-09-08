@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSettings } from '../settings';
+import { MAX_WALLPAPER_BLUR, useSettings } from '../settings';
 import { useStore } from '../store';
 import { api } from '../lib/api';
 
@@ -115,6 +115,24 @@ export default function SettingsView() {
                 </button>
               ))}
             </div>
+            <Row label="Background blur" hint="Blur strength for the desktop wallpaper in Liquid Glass">
+              <div className={`flex items-center gap-3 ${settings.theme === 'liquid' ? '' : 'opacity-40'}`}>
+                <input
+                  aria-label="Background blur"
+                  type="range"
+                  min={0}
+                  max={MAX_WALLPAPER_BLUR}
+                  step={1}
+                  disabled={settings.theme !== 'liquid'}
+                  value={settings.wallpaperBlur}
+                  onChange={(e) => update({ wallpaperBlur: +e.target.value })}
+                  className="accent-lilac"
+                />
+                <span className="w-9 text-right font-mono text-xs text-white/60">
+                  {settings.wallpaperBlur}px
+                </span>
+              </div>
+            </Row>
             <Toggle
               label="Interface sounds"
               hint="Subtle, distinct tones for navigation, actions and destructive controls"
