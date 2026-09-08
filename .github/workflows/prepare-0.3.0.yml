@@ -5,6 +5,7 @@ on:
     branches: [feat/stack-package-actions]
     paths:
       - .github/workflows/prepare-0.3.0.yml
+      - scripts/prepare-0.3.0.mjs
 
 permissions:
   contents: write
@@ -15,72 +16,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Synchronize release metadata
-        shell: bash
-        run: |
-          python3 - <<'PY'
-          import json
-          from pathlib import Path
-
-          version = '0.3.0'
-          for filename in ('package.json', 'package-lock.json', 'update.json'):
-              path = Path(filename)
-              data = json.loads(path.read_text())
-              data['version'] = version
-              if filename == 'package-lock.json':
-                  data['packages']['']['version'] = version
-              path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + '\n')
-
-          settings_path = Path('src/renderer/src/views/SettingsView.tsx')
-          settings = settings_path.read_text()
-          old_about = 'Version 0.2.0 · MIT license'
-          if settings.count(old_about) != 1:
-              raise SystemExit('Expected one Settings version label')
-          settings_path.write_text(settings.replace(old_about, 'Version 0.3.0 · MIT license'))
-
-          changelog_path = Path('CHANGELOG.md')
-          changelog = changelog_path.read_text()
-          heading = '## [0.3.0] - 2026-09-08'
-          if heading not in changelog:
-              marker = '## [0.2.0] - 2026-09-06'
-              if changelog.count(marker) != 1:
-                  raise SystemExit('Expected one 0.2.0 changelog marker')
-              entry = '''## [0.3.0] - 2026-09-08
-
-### Fixed
-
-- Rebuilt Languages & Ecosystem (Stack) so supported dependencies have one-click install and remove actions.
-- Added installed-state refresh, removal confirmation and visible command output on Linux and Windows.
-- Made package-manager execution platform-aware for npm, pnpm, Yarn, Bun, Python, Cargo, Go and .NET.
-
-### Security
-
-- Require Workspace Trust for Stack mutations and accept only shared-catalog package identifiers.
-- Prevent renderer input from becoming a shell command and avoid executing repository-local Python during status detection.
-
-### Known limitations
-
-- Java and C/C++ entries remain manual until a deterministic manifest mutation path is available.
-
-'''
-              changelog = changelog.replace(marker, entry + marker, 1)
-              changelog_path.write_text(changelog)
-
-          readme_path = Path('README.md')
-          readme = readme_path.read_text()
-          replacements = {
-              'Luma 0.2 is a developer preview.': 'Luma 0.3 is a developer preview.',
-              'Luma-0.2.0.AppImage.sigstore.json': 'Luma-0.3.0.AppImage.sigstore.json',
-              'Luma-0.2.0.AppImage': 'Luma-0.3.0.AppImage',
-              'This install runs 0.2.0.': 'This install runs 0.3.0.',
-              '- **Languages & Ecosystem** — detects runtimes and project dependencies, installs packages and frameworks with a whitelisted command set': '- **Languages & Ecosystem** — detects project dependencies and provides one-click install and remove actions through an allowlisted, Workspace Trust-protected command set',
-          }
-          for old, new in replacements.items():
-              if old not in readme:
-                  raise SystemExit(f'Missing README text: {old}')
-              readme = readme.replace(old, new)
-          readme_path.write_text(readme)
-          PY
+      - run: node scripts/prepare-0.3.0.mjs
       - name: Commit synchronized metadata
         shell: bash
         run: |
