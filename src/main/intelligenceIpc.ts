@@ -1,7 +1,9 @@
 import { BrowserWindow, dialog, ipcMain } from 'electron';
 import { runGit } from './git/exec';
 import * as intel from './intelligence';
+import { runRuntimeAction, runtimeRemovalDetail } from './runtimeTools';
 import { runStackToolAction, stackToolStatus } from './stackTools';
+import { runtimeDefinition, type RuntimeId } from '../shared/runtimeCatalog';
 export function registerIntelligenceIpc(getWindow: () => BrowserWindow | null) {
   const repo = () => {
     const w = getWindow() as (BrowserWindow & { __repo?: string }) | null;
@@ -64,6 +66,23 @@ export function registerIntelligenceIpc(getWindow: () => BrowserWindow | null) {
         if (!(await intel.trustStatus(r))) throw new Error('Trust this workspace before changing packages');
         return runStackToolAction(r, action, String(args[1] ?? ''), String(args[2] ?? ''));
       });
+      case 'runtimeAction': return wrap(async () => {
+        const action = args[0];
+        const runtimeId = String(args[1] ?? '');
+        if (action !== 'install' && action !== 'uninstall') throw new Error('Unknown runtime action');
+        const definition = runtimeDefinition(runtimeId);
+        if (!definition) throw new Error(`“${runtimeId}” is not an approved Stack runtime`);
+        if (!(await intel.trustStatus(r))) throw new Error('Trust this workspace before changing system runtimes');
+        if (action === 'uninstall') {
+          const answer = await dialog.showMessageBox(getWindow()!, {
+            type: 'warning', buttons: ['Cancel', 'Remove runtime'], defaultId: 0, cancelId: 0,
+            title: `Remove ${definition.label}?`, message: 'This is a system-wide change.',
+            detail: runtimeRemovalDetail(runtimeId as RuntimeId),
+          });
+          if (answer.response !== 1) throw new Error('Runtime removal canceled');
+        }
+        return runRuntimeAction(r, action, runtimeId);
+      });
       case 'installTool': return wrap(() => intel.installTool(r, args[0] as string, args[1] as string));
       case 'rename': return wrap(() => intel.rename(r, args[0] as string, args[1] as string));
       case 'capsules': return wrap(() => intel.capsules(r));
@@ -71,8 +90,7 @@ export function registerIntelligenceIpc(getWindow: () => BrowserWindow | null) {
       case 'undoRollback': return wrap(async () => {
         const ref = (await runGit(r, ['for-each-ref', '--sort=-refname', '--format=%(refname:short)', 'refs/heads/luma-before-rollback-*'])).trim().split('\n')[0];
         if (!ref) throw new Error('No rollback checkpoint found');
-        const stashed = await stashDirty(r, `Undo will restore ${ref} with a hard reset.`),
-          safety = `luma-before-undo-${Date.now()}`;
+        const stashed = await stashDirty(r, `Undo will restore ${ref} with a hard reset.`), safety = `luma-before-undo-${Date.now()}`;
         await runGit(r, ['branch', safety, 'HEAD']);
         await runGit(r, ['reset', '--hard', ref]);
         return { ref, safety, stashed };
