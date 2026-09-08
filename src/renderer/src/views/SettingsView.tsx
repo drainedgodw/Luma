@@ -154,7 +154,7 @@ export default function SettingsView() {
             <div className="glass-soft flex items-center justify-between px-4 py-3">
               <div>
                 <div className="text-sm font-bold tracking-[0.25em] text-lilac">LUMA</div>
-                <div className="text-xs text-white/40">Version 0.2.0 · MIT license</div>
+                <div className="text-xs text-white/40">Version 0.3.0 · MIT license</div>
               </div>
               <div className="text-right font-mono text-[11px] text-white/35">
                 <div>{repo ? repo.split('/').pop() : 'no repository'}</div>
