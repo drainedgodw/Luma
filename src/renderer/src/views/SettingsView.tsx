@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useSettings } from '../settings';
+import { MAX_PANEL_BLUR, useSettings } from '../settings';
 import { useStore } from '../store';
 import { api } from '../lib/api';
 
@@ -115,6 +115,24 @@ export default function SettingsView() {
                 </button>
               ))}
             </div>
+            <Row label="Panel blur" hint="Hyprland-style blur for the main panel, sidebars and glass blocks">
+              <div className={`flex items-center gap-3 ${settings.theme === 'liquid' ? '' : 'opacity-40'}`}>
+                <input
+                  aria-label="Panel blur"
+                  type="range"
+                  min={0}
+                  max={MAX_PANEL_BLUR}
+                  step={1}
+                  disabled={settings.theme !== 'liquid'}
+                  value={settings.panelBlur}
+                  onChange={(e) => update({ panelBlur: +e.target.value })}
+                  className="accent-lilac"
+                />
+                <span className="w-9 text-right font-mono text-xs text-white/60">
+                  {settings.panelBlur}px
+                </span>
+              </div>
+            </Row>
             <Toggle
               label="Interface sounds"
               hint="Subtle, distinct tones for navigation, actions and destructive controls"
@@ -154,7 +172,7 @@ export default function SettingsView() {
             <div className="glass-soft flex items-center justify-between px-4 py-3">
               <div>
                 <div className="text-sm font-bold tracking-[0.25em] text-lilac">LUMA</div>
-                <div className="text-xs text-white/40">Version 0.2.0 · MIT license</div>
+                <div className="text-xs text-white/40">Version 0.3.0 · MIT license</div>
               </div>
               <div className="text-right font-mono text-[11px] text-white/35">
                 <div>{repo ? repo.split('/').pop() : 'no repository'}</div>
@@ -232,15 +250,7 @@ function Updates() {
   );
 }
 
-function Row({
-  label,
-  hint,
-  children,
-}: {
-  label: string;
-  hint: string;
-  children: React.ReactNode;
-}) {
+function Row({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
   return (
     <div className="mb-3 flex items-center justify-between gap-6 rounded-xl px-2 py-2 hover:bg-white/3">
       <div>
@@ -252,17 +262,7 @@ function Row({
   );
 }
 
-function Toggle({
-  label,
-  hint,
-  value,
-  onChange,
-}: {
-  label: string;
-  hint: string;
-  value: boolean;
-  onChange: (v: boolean) => void;
-}) {
+function Toggle({ label, hint, value, onChange }: { label: string; hint: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
     <Row label={label} hint={hint}>
       <button
