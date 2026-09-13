@@ -75,7 +75,7 @@ The runtime itself is packaged as a FUSE-independent AppImage and currently targ
 
 ```sh
 git clone https://github.com/drainedgodw/luma-ide-linux.git
-cd Luma
+cd luma-ide-linux
 bash scripts/install-system-deps.sh
 bash scripts/bootstrap.sh dev
 ```
@@ -152,7 +152,12 @@ Additional views: [Lanes](docs/screenshots/history_lanes.png), [Rescue](docs/scr
 
 ## Showcase video
 
-The showcase video belongs in `docs/showcase/luma-0.2.0-showcase-1440p.mp4` for local/release distribution. GitHub's file-writing connector cannot transfer a 54.6 MB binary attachment in the same operation as text files, so the repository currently documents the exact target path and metadata in [docs/showcase/README.md](docs/showcase/README.md). Upload the MP4 with Git LFS or a GitHub Release asset before publishing the public link.
+The 54.6 MB H.264/AAC showcase video is stored in the repository with Git LFS:
+
+- [Download or open the showcase video](https://media.githubusercontent.com/media/drainedgodw/luma-ide-linux/main/docs/showcase/luma-0.2.0-showcase-1440p.mp4)
+- Local path: `docs/showcase/luma-0.2.0-showcase-1440p.mp4`
+- Duration: 48.1 seconds, 2560×1440 at 30 fps
+- SHA-256: `9896b781fc30c766b1027a00ff24fa7104ac33c4621b91cb4bbefccc023c794d`
 
 ## Reporting problems
 
