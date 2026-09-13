@@ -2,6 +2,18 @@
 
 All notable changes are documented here. Luma follows semantic versioning once stable; `0.x` releases may change behavior between prereleases.
 
+## [0.4.1] - 2026-09-14
+
+### Changed
+
+- Aligned the Linux source version with the stable Windows 0.4.1 release line.
+- Release workflow remains tag-driven and publishes a checksum-verified AppImage and tarball.
+- The Bash installer follows the newest published Linux GitHub Release automatically.
+
+### Release
+
+- Push tag `v0.4.1` after the Linux build passes to publish the stable Linux AppImage, tarball and `SHA256SUMS.txt`.
+
 ## [0.2.0] - 2026-09-06
 
 ### Added

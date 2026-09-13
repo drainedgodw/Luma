@@ -8,12 +8,12 @@
 
 A visual, Git-first desktop IDE for Linux, with a Windows edition maintained in a companion repository.
 
-![platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-1793d1) ![license](https://img.shields.io/badge/license-MIT-22c55e) ![status](https://img.shields.io/badge/status-developer%20preview-f59e0b)
+![platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-1793d1) ![license](https://img.shields.io/badge/license-MIT-22c55e) ![status](https://img.shields.io/badge/status-stable%20release%20line-22c55e)
 
 </div>
 
 > [!WARNING]
-> Luma is a developer preview. Keep a remote backup and begin with non-critical repositories.
+> Luma 0.4.1 is the new Linux release target. Keep a remote backup and begin with non-critical repositories until the first Linux 0.4.1 artifact finishes validation.
 
 ## Preview
 
@@ -40,11 +40,9 @@ A visual, Git-first desktop IDE for Linux, with a Windows edition maintained in 
 </tr>
 </table>
 
-The same interface and preview assets are used by the companion Windows edition.
-
 ## Install on Linux — Bash, x86_64
 
-One command downloads the Bash installer, verifies the release checksum, installs the AppImage under `~/.local`, creates the launcher and adds Luma to the application menu:
+Once the `v0.4.1` Linux Release is published, this one command downloads the current stable AppImage, verifies its checksum, installs it under `~/.local`, creates the launcher and adds Luma to the application menu:
 
 ```bash
 curl --fail --location --show-error --progress-bar \
@@ -52,22 +50,7 @@ curl --fail --location --show-error --progress-bar \
   | bash -s -- --install --release
 ```
 
-The command is safe to paste from fish because fish only starts `curl`; Bash reads and executes the installer. To use release → nightly → source fallback instead:
-
-```bash
-curl --fail --location --show-error --progress-bar \
-  https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/install.sh \
-  | LUMA_CHANNEL=auto bash -s -- --install
-```
-
-The current published Linux release is **v0.2.0**. There is no published v0.4.1 artifact yet, so an installer cannot download v0.4.1 until the matching AppImage, checksums and GitHub Release are created.
-
-Uninstall while keeping settings:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/install.sh \
-  | bash -s -- --uninstall
-```
+The command is Bash-first and safe to paste from fish. The current Linux release workflow is ready; pushing tag `v0.4.1` starts the GitHub Actions build and publishes the AppImage, tarball and `SHA256SUMS.txt`.
 
 ## Build from source
 
@@ -78,11 +61,11 @@ bash scripts/install-system-deps.sh
 bash scripts/bootstrap.sh dev
 ```
 
-The dependency helper supports Arch/Manjaro, Debian/Ubuntu, Fedora/RHEL, openSUSE, Alpine, Void, Gentoo and Nix. The bootstrap keeps compatible Node 22 and CPython 3.11 inside `.luma/` and does not modify your system shell.
+The dependency helper supports Arch/Manjaro, Debian/Ubuntu, Fedora/RHEL, openSUSE, Alpine, Void, Gentoo and Nix. The bootstrap keeps compatible Node 22 and CPython 3.11 inside `.luma/`.
 
 ## Windows edition
 
-See [luma-ide-windows](https://github.com/drainedgodw/luma-ide-windows) for the self-contained Windows x64 installer. The Windows repository currently also declares source version **0.2.0**; v0.4.1 is not published there yet.
+See [luma-ide-windows](https://github.com/drainedgodw/luma-ide-windows) for the stable Windows 10/11 x64 `v0.4.1` installer. Linux and Windows now share the 0.4.1 release line; their platform artifacts remain separate.
 
 ## License
 
