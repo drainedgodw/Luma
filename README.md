@@ -15,14 +15,6 @@ A visual, Git-first desktop IDE for Linux, with a Windows edition maintained in 
 > [!WARNING]
 > Luma 0.4.1 is the new Linux release target. Keep a remote backup and begin with non-critical repositories until the first Linux 0.4.1 artifact finishes validation.
 
-## Preview
-
-<video controls width="100%" poster="docs/screenshots/login.png">
-  <source src="https://media.githubusercontent.com/media/drainedgodw/luma-ide-linux/main/docs/showcase/luma-0.2.0-showcase-1440p.mp4" type="video/mp4" />
-</video>
-
-[Open or download the 48-second 1440p showcase video](https://media.githubusercontent.com/media/drainedgodw/luma-ide-linux/main/docs/showcase/luma-0.2.0-showcase-1440p.mp4)
-
 ### Screenshots — Linux and Windows editions
 
 <table>
