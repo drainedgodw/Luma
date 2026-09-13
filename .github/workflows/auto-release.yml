@@ -6,55 +6,114 @@ on:
     paths:
       - package.json
       - .github/workflows/auto-release.yml
-      - .github/workflows/release.yml
   workflow_dispatch:
 
 permissions:
   contents: write
-  actions: write
 
 concurrency:
   group: auto-release-linux
   cancel-in-progress: false
 
 jobs:
-  tag-and-dispatch:
+  build-release:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Check out source
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Read package version
         id: version
         shell: bash
         run: echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
 
-      - name: Create the release tag when needed
-        id: tag
-        shell: bash
-        run: |
-          TAG="v${{ steps.version.outputs.version }}"
-          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-            echo "created=false" >> "$GITHUB_OUTPUT"
-          else
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag -a "$TAG" "$GITHUB_SHA" -m "Luma ${{ steps.version.outputs.version }} — Linux release"
-            git push origin "$TAG"
-            echo "created=true" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Start the release build
+      - name: Check whether the release already exists
+        id: release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
           TAG="v${{ steps.version.outputs.version }}"
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo "Release $TAG already exists; nothing to do."
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "Release $TAG already exists; skipping rebuild."
           else
-            gh workflow run release.yml --repo "$GITHUB_REPOSITORY" --ref main -f tag="$TAG"
+            echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Create the release tag
+        if: steps.release.outputs.exists != 'true'
+        shell: bash
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if ! git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" "$GITHUB_SHA" -m "Luma ${{ steps.version.outputs.version }} — Linux release"
+            git push origin "$TAG"
+          fi
+
+      - name: Install native build tools
+        if: steps.release.outputs.exists != 'true'
+        run: sudo apt-get update && sudo apt-get install -y build-essential python3
+
+      - uses: actions/setup-node@v4
+        if: steps.release.outputs.exists != 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.release.outputs.exists != 'true'
+        run: npm ci
+
+      - name: Typecheck
+        if: steps.release.outputs.exists != 'true'
+        run: npm run typecheck
+
+      - name: Test
+        if: steps.release.outputs.exists != 'true'
+        run: npm test
+
+      - name: Build
+        if: steps.release.outputs.exists != 'true'
+        run: npm run build
+
+      - name: Rebuild native modules for Electron
+        if: steps.release.outputs.exists != 'true'
+        run: npx electron-rebuild --force --which-module node-pty
+
+      - name: Package AppImage and tarball
+        if: steps.release.outputs.exists != 'true'
+        run: npx electron-builder --linux AppImage tar.gz --publish never
+
+      - name: Compute checksums
+        if: steps.release.outputs.exists != 'true'
+        run: cd dist && sha256sum *.AppImage *.tar.gz > SHA256SUMS.txt
+
+      - name: Upload build artifacts
+        if: steps.release.outputs.exists != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: luma-linux-v${{ steps.version.outputs.version }}
+          path: |
+            dist/*.AppImage
+            dist/*.tar.gz
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        if: steps.release.outputs.exists != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          files: |
+            dist/*.AppImage
+            dist/*.tar.gz
+            dist/SHA256SUMS.txt
+          generate_release_notes: true
+          prerelease: false
