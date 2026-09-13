@@ -4,7 +4,7 @@
 
 # Luma
 
-**See what Git will do before it does it.**
+**Make every Git move visible before it matters.**
 
 A visual, Git-first desktop IDE for Linux, with a Windows edition maintained in a companion repository.
 
@@ -13,157 +13,76 @@ A visual, Git-first desktop IDE for Linux, with a Windows edition maintained in 
 </div>
 
 > [!WARNING]
-> Luma 0.2 is a developer preview. Keep a remote backup and begin with non-critical repositories.
+> Luma is a developer preview. Keep a remote backup and begin with non-critical repositories.
 
-## Why Luma?
+## Preview
 
-Most IDEs treat Git as a sidebar. Luma treats history as the workspace itself: inspect commits in a visual web, preview a rewrite before applying it, and keep a recovery point before moving `HEAD`.
+<video controls width="100%" poster="docs/screenshots/login.png">
+  <source src="https://media.githubusercontent.com/media/drainedgodw/luma-ide-linux/main/docs/showcase/luma-0.2.0-showcase-1440p.mp4" type="video/mp4" />
+</video>
 
-## Install on Linux
+[Open or download the 48-second 1440p showcase video](https://media.githubusercontent.com/media/drainedgodw/luma-ide-linux/main/docs/showcase/luma-0.2.0-showcase-1440p.mp4)
 
-The installer is Bash-only, but it is **fish-safe**: fish should download the file and hand it to Bash rather than trying to interpret Bash syntax itself.
+### Screenshots — Linux and Windows editions
 
-```fish
+<table>
+<tr>
+<td><img src="docs/screenshots/login.png" alt="Luma start screen" /></td>
+<td><img src="docs/screenshots/code.png" alt="Luma code editor" /></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/changes.png" alt="Luma changes view" /></td>
+<td><img src="docs/screenshots/history_orbit.png" alt="Luma history view" /></td>
+</tr>
+<tr>
+<td><img src="docs/screenshots/GitHub.png" alt="Luma GitHub integration" /></td>
+<td><img src="docs/screenshots/Tools.png" alt="Luma tools view" /></td>
+</tr>
+</table>
+
+The same interface and preview assets are used by the companion Windows edition.
+
+## Install on Linux — Bash, x86_64
+
+One command downloads the Bash installer, verifies the release checksum, installs the AppImage under `~/.local`, creates the launcher and adds Luma to the application menu:
+
+```bash
 curl --fail --location --show-error --progress-bar \
   https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/install.sh \
-  --output /tmp/luma-install.sh
-LUMA_CHANNEL=auto bash /tmp/luma-install.sh --install
+  | bash -s -- --install --release
 ```
 
-If you prefer a one-liner, run it through Bash explicitly:
+The command is safe to paste from fish because fish only starts `curl`; Bash reads and executes the installer. To use release → nightly → source fallback instead:
 
-```fish
-LUMA_CHANNEL=auto bash -c 'curl --fail --location --show-error --progress-bar https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/install.sh | bash -s -- --install'
+```bash
+curl --fail --location --show-error --progress-bar \
+  https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/install.sh \
+  | LUMA_CHANNEL=auto bash -s -- --install
 ```
 
-The installer logs each phase, shows downloads, verifies SHA-256 checksums, and installs to `~/.local` without root. Use `bash -x` for a command trace:
+The current published Linux release is **v0.2.0**. There is no published v0.4.1 artifact yet, so an installer cannot download v0.4.1 until the matching AppImage, checksums and GitHub Release are created.
 
-```fish
-LUMA_CHANNEL=auto bash -x /tmp/luma-install.sh --install
+Uninstall while keeping settings:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/install.sh \
+  | bash -s -- --uninstall
 ```
 
-Actions and channels:
+## Build from source
 
-```text
---install / --update       install or atomically update
---uninstall                remove the application but keep settings
---purge                    remove the application and user data
-LUMA_CHANNEL=auto          release -> nightly -> source fallback
---release                  require a signed/checksummed release AppImage
---nightly                  install the latest nightly AppImage
---source                   build the selected branch locally
-```
-
-The same command works on a fresh machine and on updates. For a source build, the installer invokes the self-contained bootstrap and can install missing native build tools with `--install-system-deps`.
-
-### Supported Linux distributions
-
-The portable dependency helper covers Arch/Manjaro (`pacman`), Debian/Ubuntu (`apt-get`), Fedora/RHEL (`dnf`/`yum`), openSUSE (`zypper`), Alpine (`apk`), Void (`xbps-install`), Gentoo (`emerge`), and Nix (`nix`). If a distribution is not detected, the script prints the exact packages it needs instead of failing silently.
-
-The runtime itself is packaged as a FUSE-independent AppImage and currently targets Linux x86_64. ARM64 source builds are supported by the development bootstrap, but an ARM64 release artifact is not published yet.
-
-## Fish / Caelestia troubleshooting
-
-1. Do not run `curl ... | sh` from fish; use `bash /tmp/luma-install.sh` as shown above.
-2. Make sure the file is executable only if you invoke it directly: `chmod +x /tmp/luma-install.sh`.
-3. Run `bash /tmp/luma-install.sh --help` first. The output confirms that Bash is reading the script.
-4. For a source build, run `bash scripts/install-system-deps.sh` and then `bash scripts/bootstrap.sh dev -- --verbose`.
-5. If the desktop entry does not appear immediately, launch `~/.local/bin/luma` once, then restart the desktop shell.
-6. Attach the complete `[Luma installer]` or `[Luma setup]` log to a bug report; the scripts intentionally print the phase and downloaded asset without printing credentials.
-
-## From source
-
-```sh
+```bash
 git clone https://github.com/drainedgodw/luma-ide-linux.git
 cd luma-ide-linux
 bash scripts/install-system-deps.sh
 bash scripts/bootstrap.sh dev
 ```
 
-The bootstrap downloads a compatible private Node 22 and CPython 3.11 for the `node-pty` native build into the ignored `.luma/` directory. It does not touch your system Node, Python, fish, Bash, or shell configuration. Use `LUMA_USE_SYSTEM_NODE=1` only when your system Node is already in the supported `>=22.20 <23` range.
+The dependency helper supports Arch/Manjaro, Debian/Ubuntu, Fedora/RHEL, openSUSE, Alpine, Void, Gentoo and Nix. The bootstrap keeps compatible Node 22 and CPython 3.11 inside `.luma/` and does not modify your system shell.
 
-Useful checks:
+## Windows edition
 
-```sh
-bash scripts/bootstrap.sh doctor
-bash scripts/bootstrap.sh typecheck
-bash scripts/bootstrap.sh test
-bash scripts/bootstrap.sh --help
-```
-
-## Linux and Windows versions
-
-The Linux and Windows editions are intended to ship the same Luma version and feature line. The companion repository is [luma-ide-windows](https://github.com/drainedgodw/luma-ide-windows). At the time of this update, both repositories declare version **0.2.0** in `package.json`; **0.4.1 is not yet present in the Windows repository**. Version bumps should be made in both repositories together once the 0.4.1 release is actually prepared.
-
-The Windows edition bundles its runtime and Git. Linux uses the AppImage installer or the self-contained source bootstrap because Linux distributions differ in package managers, compilers, display servers, and FUSE availability.
-
-## Features
-
-- **History** — commit graph in two views: classic Lanes and an interactive Orbit web
-- **Changes** — staging by drag & drop, diffs, conflict resolution, and commit templates
-- **Visual rebase** — reorder, squash, fixup, reword, drop, cherry-pick, revert, tags, and merges
-- **Safety net** — Secret Guard, checkpoint branches, reflog Rescue, bisect, and stash
-- **Editor** — CodeMirror 6 with syntax highlighting, tabs, find & replace, and project search
-- **Terminal** — integrated terminal unlocked per repository via Workspace Trust
-- **GitHub** — fine-grained PAT or SSH keys, clone, fetch, pull, and push
-- **Languages & Ecosystem** — detects runtimes and project dependencies
-- **Updates** — anonymous version check with no accounts and no telemetry
-- **Two themes** — Cosmos and Liquid Glass
-
-## Keyboard
-
-- Ctrl + `P` — quick open file
-- Ctrl + `F` — find in editor / search workspace
-- Ctrl + Shift + `F` — search across the project
-- Ctrl + Shift + `P` — command palette
-- Ctrl + `B` — pin/auto-hide Explorer
-- Ctrl + `` ` `` — terminal
-
-## Project structure
-
-```text
-src/main/       Electron process, Git, terminal, trust and filesystem services
-src/preload/    typed and allowlisted IPC bridge
-src/renderer/   React UI, editor and visual Git workflows
-scripts/        portable bootstrap, dependency helper and install diagnostics
-tests/          parser, Git integration, security and recovery tests
-```
-
-## Screenshots
-
-The screenshots are intentionally presented as a compact contact sheet so the main flows can be compared at a glance.
-
-<table>
-<tr>
-<td><img src="docs/screenshots/login.png" alt="Start" /></td>
-<td><img src="docs/screenshots/code.png" alt="Code" /></td>
-</tr>
-<tr>
-<td><img src="docs/screenshots/changes.png" alt="Changes" /></td>
-<td><img src="docs/screenshots/history_orbit.png" alt="History Orbit" /></td>
-</tr>
-<tr>
-<td><img src="docs/screenshots/GitHub.png" alt="GitHub" /></td>
-<td><img src="docs/screenshots/Tools.png" alt="Tools" /></td>
-</tr>
-</table>
-
-Additional views: [Lanes](docs/screenshots/history_lanes.png), [Rescue](docs/screenshots/rescue.png), [Stack](docs/screenshots/stack.png), and [Settings](docs/screenshots/setup.png).
-
-## Showcase video
-
-The 54.6 MB H.264/AAC showcase video is stored in the repository with Git LFS:
-
-- [Download or open the showcase video](https://media.githubusercontent.com/media/drainedgodw/luma-ide-linux/main/docs/showcase/luma-0.2.0-showcase-1440p.mp4)
-- Local path: `docs/showcase/luma-0.2.0-showcase-1440p.mp4`
-- Duration: 48.1 seconds, 2560×1440 at 30 fps
-- SHA-256: `9896b781fc30c766b1027a00ff24fa7104ac33c4621b91cb4bbefccc023c794d`
-
-## Reporting problems
-
-- Security issue: follow [SECURITY.md](SECURITY.md); do not open a public exploit report.
-- Bug or feature proposal: open a GitHub issue with OS, display server, Git version, reproduction steps, and logs with secrets removed.
-- Contribution: read [CONTRIBUTING.md](CONTRIBUTING.md).
+See [luma-ide-windows](https://github.com/drainedgodw/luma-ide-windows) for the self-contained Windows x64 installer. The Windows repository currently also declares source version **0.2.0**; v0.4.1 is not published there yet.
 
 ## License
 
