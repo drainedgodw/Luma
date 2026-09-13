@@ -3,6 +3,12 @@ name: Release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag to build
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -13,6 +19,8 @@ jobs:
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -31,21 +39,23 @@ jobs:
         run: cd dist && sha256sum *.AppImage *.tar.gz > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
         with:
-          name: luma-linux-${{ github.ref_name }}
+          name: luma-linux-${{ inputs.tag || github.ref_name }}
           path: |
             dist/*.AppImage
             dist/*.tar.gz
             dist/SHA256SUMS.txt
           if-no-files-found: error
-      - name: Create GitHub prerelease
+      - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          target_commitish: ${{ inputs.tag || github.ref }}
           files: |
             dist/*.AppImage
             dist/*.tar.gz
             dist/SHA256SUMS.txt
           generate_release_notes: true
-          prerelease: ${{ contains(github.ref_name, '-') }}
+          prerelease: ${{ contains(inputs.tag || github.ref_name, '-') }}
 
   publish-aur:
     if: ${{ vars.AUR_ENABLED == 'true' }}
@@ -53,6 +63,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
       - name: Validate AUR configuration
         env:
           AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
@@ -64,6 +76,7 @@ jobs:
           AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
           AUR_USER: ${{ secrets.AUR_USER }}
           AUR_EMAIL: ${{ secrets.AUR_EMAIL }}
+          RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
         run: |
           eval "$(ssh-agent -s)"
           printf '%s' "$AUR_SSH_PRIVATE_KEY" | ssh-add -
@@ -71,4 +84,4 @@ jobs:
           ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts
           git config --global user.name "$AUR_USER"
           git config --global user.email "$AUR_EMAIL"
-          .github/scripts/update-aur.sh "${GITHUB_REF_NAME#v}"
+          .github/scripts/update-aur.sh "${RELEASE_TAG#v}"
