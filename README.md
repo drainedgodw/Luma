@@ -27,19 +27,19 @@ The installer is Bash-only, but it is **fish-safe**: fish should download the fi
 curl --fail --location --show-error --progress-bar \
   https://raw.githubusercontent.com/drainedgodw/Luma/main/install.sh \
   --output /tmp/luma-install.sh
-bash /tmp/luma-install.sh --install --auto
+LUMA_CHANNEL=auto bash /tmp/luma-install.sh --install
 ```
 
 If you prefer a one-liner, run it through Bash explicitly:
 
 ```fish
-bash -c 'curl --fail --location --show-error --progress-bar https://raw.githubusercontent.com/drainedgodw/Luma/main/install.sh | bash -s -- --install --auto'
+LUMA_CHANNEL=auto bash -c 'curl --fail --location --show-error --progress-bar https://raw.githubusercontent.com/drainedgodw/Luma/main/install.sh | bash -s -- --install'
 ```
 
-The installer logs each phase, shows downloads, verifies SHA-256 checksums, and installs to `~/.local` without root. Use `LUMA_TRACE=1` for a command trace:
+The installer logs each phase, shows downloads, verifies SHA-256 checksums, and installs to `~/.local` without root. Use `bash -x` for a command trace:
 
 ```fish
-LUMA_TRACE=1 bash /tmp/luma-install.sh --install --auto
+LUMA_CHANNEL=auto bash -x /tmp/luma-install.sh --install
 ```
 
 Actions and channels:
@@ -48,7 +48,7 @@ Actions and channels:
 --install / --update       install or atomically update
 --uninstall                remove the application but keep settings
 --purge                    remove the application and user data
---auto                     release -> nightly -> source fallback
+LUMA_CHANNEL=auto          release -> nightly -> source fallback
 --release                  require a signed/checksummed release AppImage
 --nightly                  install the latest nightly AppImage
 --source                   build the selected branch locally
