@@ -65,7 +65,7 @@ jobs:
             Rolling Linux x86_64 build from `main`.
 
             Install or update with:
-            `bash -c "$(curl -fsSL https://raw.githubusercontent.com/drainedgodw/Luma/main/install.sh)"`
+            `bash -c "$(curl -fsSL https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/install.sh)"`
           files: |
             dist/*.AppImage
             dist/SHA256SUMS.txt

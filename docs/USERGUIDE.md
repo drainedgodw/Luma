@@ -9,7 +9,7 @@ Luma is a Git-first IDE built around a visual history. This guide covers everyth
 Install or update Luma with one command (works like a package manager — desktop entry, icon, and a `luma` command are created automatically):
 
 ```bash
-pkill -x luma 2>/dev/null || true; bash -c "$(curl -fsSL https://raw.githubusercontent.com/drainedgodw/Luma/main/install.sh)"
+pkill -x luma 2>/dev/null || true; bash -c "$(curl -fsSL https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/install.sh)"
 ```
 
 After installation, launch Luma from your application menu or by typing `luma` in a terminal.
@@ -17,13 +17,13 @@ After installation, launch Luma from your application menu or by typing `luma` i
 Remove the app but keep your settings:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/drainedgodw/Luma/main/install.sh | bash -s -- --uninstall
+curl -fsSL https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/install.sh | bash -s -- --uninstall
 ```
 
 Remove everything (app, settings, sessions, saved credentials):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/drainedgodw/Luma/main/install.sh | bash -s -- --purge
+curl -fsSL https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/install.sh | bash -s -- --purge
 ```
 
 > AppImage is unpacked during installation, so FUSE is not required.
@@ -139,7 +139,7 @@ The GitHub section connects to your account (credentials are stored locally in y
 ## 13. Getting help
 
 - Something looks wrong? Check **Help** in the top bar for the built-in getting-started guide.
-- Found a bug or have an idea? Open an issue at <https://github.com/drainedgodw/Luma/issues>.
+- Found a bug or have an idea? Open an issue at <https://github.com/drainedgodw/luma-ide-linux/issues>.
 - Prefer a quick chat? Message the author on Telegram: [@upsetsay](https://t.me/upsetsay).
 - Security-related reports: see `SECURITY.md`.
 

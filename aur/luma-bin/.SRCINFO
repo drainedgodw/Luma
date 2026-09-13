@@ -2,7 +2,7 @@ pkgbase = luma-bin
 	pkgdesc = Visual Git-first IDE with a commit web, interactive rebase, and built-in editor
 	pkgver = 0.1.0
 	pkgrel = 1
-	url = https://github.com/drainedgodw/Luma
+	url = https://github.com/drainedgodw/luma-ide-linux
 	arch = x86_64
 	license = MIT
 	depends = expat
@@ -32,7 +32,7 @@ pkgbase = luma-bin
 	noextract = Luma-0.1.0.AppImage
 	options = !strip
 	options = !debug
-	source_x86_64 = https://github.com/drainedgodw/Luma/releases/download/v0.1.0/Luma-0.1.0.AppImage
+	source_x86_64 = https://github.com/drainedgodw/luma-ide-linux/releases/download/v0.1.0/Luma-0.1.0.AppImage
 	sha256sums_x86_64 = cc3b37a43022a38ee0d1cdc78b959f0ed9b35a32748c95fdbb9d777563e6640e
 
 pkgname = luma-bin

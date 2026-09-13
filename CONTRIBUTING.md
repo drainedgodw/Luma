@@ -5,7 +5,7 @@ Luma welcomes focused bug fixes, tests and usability improvements. Large feature
 ## Setup
 
 ```sh
-git clone https://github.com/drainedgodw/Luma.git
+git clone https://github.com/drainedgodw/luma-ide-linux.git
 cd Luma
 npm ci
 npm run typecheck

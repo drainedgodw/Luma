@@ -25,7 +25,7 @@ The installer is Bash-only, but it is **fish-safe**: fish should download the fi
 
 ```fish
 curl --fail --location --show-error --progress-bar \
-  https://raw.githubusercontent.com/drainedgodw/Luma/main/install.sh \
+  https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/install.sh \
   --output /tmp/luma-install.sh
 LUMA_CHANNEL=auto bash /tmp/luma-install.sh --install
 ```
@@ -33,7 +33,7 @@ LUMA_CHANNEL=auto bash /tmp/luma-install.sh --install
 If you prefer a one-liner, run it through Bash explicitly:
 
 ```fish
-LUMA_CHANNEL=auto bash -c 'curl --fail --location --show-error --progress-bar https://raw.githubusercontent.com/drainedgodw/Luma/main/install.sh | bash -s -- --install'
+LUMA_CHANNEL=auto bash -c 'curl --fail --location --show-error --progress-bar https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/install.sh | bash -s -- --install'
 ```
 
 The installer logs each phase, shows downloads, verifies SHA-256 checksums, and installs to `~/.local` without root. Use `bash -x` for a command trace:
@@ -74,7 +74,7 @@ The runtime itself is packaged as a FUSE-independent AppImage and currently targ
 ## From source
 
 ```sh
-git clone https://github.com/drainedgodw/Luma.git
+git clone https://github.com/drainedgodw/luma-ide-linux.git
 cd Luma
 bash scripts/install-system-deps.sh
 bash scripts/bootstrap.sh dev

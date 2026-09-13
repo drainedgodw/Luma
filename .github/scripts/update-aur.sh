@@ -5,7 +5,7 @@ set -euo pipefail
 
 RELEASE_VERSION="$1"
 PKGVER="${RELEASE_VERSION//-/_}"
-REPO="drainedgodw/Luma"
+REPO="drainedgodw/luma-ide-linux"
 AUR_PACKAGE="luma-ide-bin"
 ASSET_BASE="{{https://github.com/${REPO}}}/releases/download/v${RELEASE_VERSION}"
 CLONE=$(mktemp -d)

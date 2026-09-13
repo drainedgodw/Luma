@@ -3,8 +3,8 @@ import { spawn } from 'node:child_process';
 
 // Anonymous update check: one static file over plain HTTPS.
 // No account, no token, no machine id — everyone gets the same bytes.
-const VERSION_URL = 'https://raw.githubusercontent.com/drainedgodw/Luma/main/update.json';
-const INSTALLER_URL = 'https://raw.githubusercontent.com/drainedgodw/Luma/main/install.sh';
+const VERSION_URL = 'https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/update.json';
+const INSTALLER_URL = 'https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/install.sh';
 
 function newerThan(latest: string, current: string): boolean {
   const a = latest.split('.').map(Number);

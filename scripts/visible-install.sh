@@ -5,7 +5,7 @@
 set -Eeuo pipefail
 IFS=$'\n\t'
 
-readonly URL="${LUMA_INSTALL_URL:-https://raw.githubusercontent.com/drainedgodw/Luma/main/install.sh}"
+readonly URL="${LUMA_INSTALL_URL:-https://raw.githubusercontent.com/drainedgodw/luma-ide-linux/main/install.sh}"
 tmp="$(mktemp "${TMPDIR:-/tmp}/luma-installer.XXXXXX.sh")"
 cleanup() { rm -f -- "$tmp"; }
 trap cleanup EXIT INT TERM
