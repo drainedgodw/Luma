@@ -1,0 +1,55 @@
+name: Auto release Linux
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - .github/workflows/auto-release.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: auto-release-linux
+  cancel-in-progress: false
+
+jobs:
+  tag-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read package version
+        id: version
+        shell: bash
+        run: echo "version=$(node -p \"require('./package.json').version\")" >> "$GITHUB_OUTPUT"
+
+      - name: Check whether the release tag already exists
+        id: tag
+        shell: bash
+        run: |
+          if git ls-remote --exit-code --tags origin "refs/tags/v${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create and push the release tag
+        if: steps.tag.outputs.exists != 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.version.outputs.version }}" "$GITHUB_SHA" \
+            -m "Luma ${{ steps.version.outputs.version }} — Linux release"
+          git push origin "v${{ steps.version.outputs.version }}"
+
+      - name: Report existing release tag
+        if: steps.tag.outputs.exists == 'true'
+        run: echo "Release v${{ steps.version.outputs.version }} already exists; no new tag was created."
